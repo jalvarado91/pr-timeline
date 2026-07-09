@@ -378,8 +378,8 @@ body[data-theme="player"] #topcard {
   overflow: hidden;
 }
 body[data-theme="player"] #topcard.tc-tr { top: 44px; right: 12px; }
-body[data-theme="player"] #topcard.tc-br { bottom: 78px; right: 12px; }
-body[data-theme="player"] #topcard.tc-bl { bottom: 78px; left: 12px; }
+body[data-theme="player"] #topcard.tc-br { bottom: 86px; right: 12px; }
+body[data-theme="player"] #topcard.tc-bl { bottom: 86px; left: 12px; }
 body[data-theme="player"] #topcard.tc-tl { top: 44px; left: 12px; }
 
 body[data-theme="player"] #header {
@@ -425,7 +425,7 @@ body[data-theme="player"] #rail {
   position: fixed;
   left: 12px;
   top: 44px;
-  bottom: 78px;
+  bottom: 86px;
   width: 264px;
   z-index: 10;
   border-right: none;
@@ -437,7 +437,32 @@ body[data-theme="player"] #rail {
   box-shadow: 0 10px 34px rgba(0, 0, 0, 0.45);
 }
 
-/* --- now-playing bar --- */
+/* --- floating timeline pill + status bar --- */
+
+#timeline-pill { display: none; }
+body[data-theme="player"] #timeline-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 40px;
+  width: min(680px, calc(100vw - 24px));
+  z-index: 25;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.45);
+  padding: 8px 12px;
+}
+body[data-theme="player"] #scrubber {
+  flex: 1;
+  height: 14px;
+  padding: 0;
+}
 
 body[data-theme="player"] #status {
   position: fixed;
@@ -449,13 +474,9 @@ body[data-theme="player"] #status {
   background: var(--glass);
   -webkit-backdrop-filter: blur(20px) saturate(1.5);
   backdrop-filter: blur(20px) saturate(1.5);
-  padding: 9px 14px 7px;
+  padding: 0;
 }
-body[data-theme="player"] #scrubber {
-  height: 14px;
-  padding: 0 2px 7px;
-}
-body[data-theme="player"] #status-row { padding: 0 2px; }
+body[data-theme="player"] #status-row { padding: 6px 14px; }
 body[data-theme="player"] .nav-btn {
   width: 24px;
   height: 24px;

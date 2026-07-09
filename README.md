@@ -30,7 +30,8 @@ Two halves:
 - Two looks, cycled with `v` (remembered across sessions):
   - **player** (default) — mac-flavored: edge-to-edge code under a glass menu
     bar, a floating commit card with traffic-dot controls (minimize to a chip,
-    cycle corners — also `m` / `c`), and a now-playing bar holding the scrubber
+    cycle corners — also `m` / `c`), a floating timeline pill with the scrubber
+    and transport, and a slim status bar with file info and shortcuts
   - **clean** — quiet docked editor-native chrome
 
 ## Install

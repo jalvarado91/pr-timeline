@@ -126,19 +126,20 @@ function applyTheme(name) {
   document.body.dataset.theme = name;
   store?.setItem('prtl-theme', name);
   monacoApi?.editor.setTheme(`replay-${name}`);
-  // player mode docks the scrubber inside the now-playing bar and clears the
-  // stage: the rail becomes an on-demand overlay
+  // player mode docks the transport (‹ scrubber ›) into the floating timeline
+  // pill and clears the stage: the rail becomes an on-demand overlay
   if (name === 'player') {
-    $('status').prepend($('scrubber'));
+    $('timeline-pill').append($('btn-prev'), $('scrubber'), $('btn-next'));
     $('rail').classList.add('hidden');
   } else {
     document.body.insertBefore($('scrubber'), $('topcard'));
+    $('status-row').prepend($('btn-prev'), $('btn-next'));
     $('rail').classList.remove('hidden');
   }
   applyCard();
   syncBarButtons();
   diffEditor?.updateOptions({
-    padding: name === 'player' ? { top: 48, bottom: 84 } : { top: 14 },
+    padding: name === 'player' ? { top: 48, bottom: 110 } : { top: 14 },
   });
 }
 
