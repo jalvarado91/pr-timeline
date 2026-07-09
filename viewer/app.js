@@ -6,13 +6,8 @@ require.config({ paths: { vs: '/vs' } });
 const $ = (id) => document.getElementById(id);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const THEMES = ['player', 'clean'];
-const EDITOR_BG = { clean: '#1a1a1d', player: '#161619' };
 const CORNERS = ['tc-tr', 'tc-br', 'tc-bl', 'tc-tl'];
 const store = (() => { try { return window.localStorage; } catch { return null; } })();
-let theme = store?.getItem('prtl-theme');
-if (!THEMES.includes(theme)) theme = 'player';
-document.body.dataset.theme = theme;
 let cardCorner = store?.getItem('prtl-corner');
 if (!CORNERS.includes(cardCorner)) cardCorner = 'tc-tr';
 let cardMin = store?.getItem('prtl-cardmin') === '1';
@@ -28,7 +23,6 @@ const state = {
   models: [],
   decorations: [],
   foldUnchanged: false,
-  showBody: true,
 };
 
 let monacoApi = null;
@@ -59,7 +53,6 @@ async function init() {
   renderRailCommits();
   bindKeys();
   document.title = `${state.timeline.branch} · pr-timeline`;
-  $('branch').textContent = `${state.timeline.repo} · ${state.timeline.branch}`;
   $('topbar-branch').textContent = `${state.timeline.repo} · ${state.timeline.branch}`;
 
   const start = parseHash() ?? { frame: 0, change: 0 };
@@ -74,27 +67,25 @@ function setupMonaco() {
       noSemanticValidation: true, noSyntaxValidation: true,
     });
   }
-  for (const t of THEMES) {
-    m.editor.defineTheme(`replay-${t}`, {
-      base: 'vs-dark',
-      inherit: true,
-      rules: [],
-      colors: {
-        'editor.background': EDITOR_BG[t],
-        'editorGutter.background': EDITOR_BG[t],
-        'editorLineNumber.foreground': '#45454d',
-        'editorLineNumber.activeForeground': '#77777d',
-        'diffEditor.insertedLineBackground': '#1f341f66',
-        'diffEditor.insertedTextBackground': '#2ea04326',
-        'diffEditor.removedLineBackground': '#3c202066',
-        'diffEditor.removedTextBackground': '#e05f5f21',
-        'scrollbarSlider.background': '#3d3d4455',
-        'scrollbarSlider.hoverBackground': '#3d3d4488',
-      },
-    });
-  }
+  m.editor.defineTheme('replay-dark', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [],
+    colors: {
+      'editor.background': '#161619',
+      'editorGutter.background': '#161619',
+      'editorLineNumber.foreground': '#45454d',
+      'editorLineNumber.activeForeground': '#77777d',
+      'diffEditor.insertedLineBackground': '#1f341f66',
+      'diffEditor.insertedTextBackground': '#2ea04326',
+      'diffEditor.removedLineBackground': '#3c202066',
+      'diffEditor.removedTextBackground': '#e05f5f21',
+      'scrollbarSlider.background': '#3d3d4455',
+      'scrollbarSlider.hoverBackground': '#3d3d4488',
+    },
+  });
   diffEditor = m.editor.createDiffEditor($('editor'), {
-    theme: `replay-${theme}`,
+    theme: 'replay-dark',
     automaticLayout: true,
     readOnly: true,
     originalEditable: false,
@@ -105,7 +96,7 @@ function setupMonaco() {
     scrollBeyondLastLine: true,
     fontSize: 13,
     lineHeight: 21,
-    padding: { top: 14 },
+    padding: { top: 14, bottom: 72 },   /* clear the floating timeline pill */
     renderLineHighlight: 'none',
     diffAlgorithm: 'advanced',
     hideUnchangedRegions: { enabled: false },
@@ -118,38 +109,15 @@ function setupMonaco() {
       }
     });
   }
-  applyTheme(theme);
-}
-
-function applyTheme(name) {
-  theme = name;
-  document.body.dataset.theme = name;
-  store?.setItem('prtl-theme', name);
-  monacoApi?.editor.setTheme(`replay-${name}`);
-  // player mode docks the transport (‹ scrubber ›) into the floating timeline
-  // pill and clears the stage: the rail becomes an on-demand overlay
-  if (name === 'player') {
-    $('timeline-pill').append($('btn-prev'), $('scrubber'), $('btn-next'));
-    $('rail').classList.add('hidden');
-  } else {
-    document.body.insertBefore($('scrubber'), $('topcard'));
-    $('status-row').prepend($('btn-prev'), $('btn-next'));
-    $('rail').classList.remove('hidden');
-  }
   applyCard();
   syncBarButtons();
-  diffEditor?.updateOptions({
-    padding: name === 'player' ? { top: 48, bottom: 110 } : { top: 14 },
-  });
 }
 
 function applyCard() {
   const card = $('topcard');
   card.classList.remove(...CORNERS, 'min');
-  if (theme === 'player') {
-    card.classList.add(cardCorner);
-    if (cardMin) card.classList.add('min');
-  }
+  card.classList.add(cardCorner);
+  if (cardMin) card.classList.add('min');
 }
 
 function cycleCorner() {
@@ -167,10 +135,6 @@ function toggleCardMin(min = !cardMin) {
 function syncBarButtons() {
   $('tb-rail').classList.toggle('active', !$('rail').classList.contains('hidden'));
   $('tb-fold').classList.toggle('active', state.foldUnchanged);
-}
-
-function cycleTheme() {
-  applyTheme(THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length]);
 }
 
 /* ---------------- navigation ---------------- */
@@ -357,10 +321,9 @@ function renderChrome() {
   const { commits } = state.timeline;
   $('position').textContent = `${fr.c + 1} / ${commits.length}`;
   $('subject').textContent = fr.commit.subject;
-  $('body-toggle').hidden = !fr.commit.body || state.showBody;
   const bodyEl = $('commit-body');
   bodyEl.textContent = fr.commit.body;
-  bodyEl.hidden = !fr.commit.body || !state.showBody;
+  bodyEl.hidden = !fr.commit.body;
 
   const dir = fr.file.path.includes('/')
     ? fr.file.path.slice(0, fr.file.path.lastIndexOf('/') + 1) : '';
@@ -500,9 +463,8 @@ function handleNavKey(e) {
     case 'G': loadFrame(firstFrameOfCommit(state.timeline.commits.length - 1), 0); return true;
     case 't': toggleRail(); return true;
     case 'x': toggleFold(); return true;
-    case 'v': cycleTheme(); return true;
-    case 'c': if (theme === 'player') cycleCorner(); return true;
-    case 'm': theme === 'player' ? toggleCardMin() : toggleBody(); return true;
+    case 'c': cycleCorner(); return true;
+    case 'm': toggleCardMin(); return true;
     case '?': $('help').hidden = false; return true;
     default: return false;
   }
@@ -514,12 +476,10 @@ function bindKeys() {
     if (handleNavKey(e)) e.preventDefault();
   });
   $('help').addEventListener('click', () => { $('help').hidden = true; });
-  $('body-toggle').addEventListener('click', toggleBody);
   $('btn-prev').addEventListener('click', prev);
   $('btn-next').addEventListener('click', next);
   $('tb-rail').addEventListener('click', toggleRail);
   $('tb-fold').addEventListener('click', toggleFold);
-  $('tb-look').addEventListener('click', cycleTheme);
   $('tb-keys').addEventListener('click', () => { $('help').hidden = false; });
   document.querySelector('.dot-min').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -530,7 +490,7 @@ function bindKeys() {
     cycleCorner();
   });
   $('topcard').addEventListener('click', () => {
-    if (theme === 'player' && cardMin) toggleCardMin(false);
+    if (cardMin) toggleCardMin(false);
   });
 }
 
@@ -545,11 +505,6 @@ function toggleFold() {
     hideUnchangedRegions: { enabled: state.foldUnchanged, revealLineCount: 8, contextLineCount: 4 },
   });
   syncBarButtons();
-}
-
-function toggleBody() {
-  state.showBody = !state.showBody;
-  renderChrome();
 }
 
 function updateHash() {

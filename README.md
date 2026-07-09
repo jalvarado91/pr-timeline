@@ -25,14 +25,12 @@ Two halves:
 - A filmstrip scrubber up top — one segment per commit, sized by churn, one
   tick per file. Click anywhere to seek.
 - A sidebar with the commit list and the current commit's files (`t`, or the
-  `sidebar` button).
+  `sidebar` button) — it docks beside the editor, pushing it over.
 - `x` (or `fold`) folds unchanged regions when you want just the deltas.
-- Two looks, cycled with `v` (remembered across sessions):
-  - **player** (default) — mac-flavored: edge-to-edge code under a glass menu
-    bar, a floating commit card with traffic-dot controls (minimize to a chip,
-    cycle corners — also `m` / `c`), a floating timeline pill with the scrubber
-    and transport, and a slim status bar with file info and shortcuts
-  - **clean** — quiet docked editor-native chrome
+- Mac-flavored chrome: a slim menu bar and status bar; the commit card floats
+  in glass with traffic-dot controls (minimize to a chip, cycle corners —
+  also `m` / `c`); the scrubber rides in a floating timeline pill with the
+  prev/next transport.
 
 ## Install
 

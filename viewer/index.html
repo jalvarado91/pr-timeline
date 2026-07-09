@@ -7,8 +7,6 @@
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <div id="scrubber" aria-label="commit timeline"></div>
-
   <div id="topbar">
     <button class="bar-btn" id="tb-rail" title="toggle sidebar (t)">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
@@ -25,17 +23,18 @@
       </svg>
       fold
     </button>
-    <button class="bar-btn" id="tb-look" title="switch look (v)">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
-        <circle cx="8" cy="8" r="5.8"/>
-        <path d="M8 2.2 a5.8 5.8 0 0 1 0 11.6 Z" fill="currentColor" stroke="none"/>
-      </svg>
-      look
-    </button>
     <span class="spacer"></span>
     <span id="topbar-branch" class="mono dim"></span>
     <button class="bar-btn" id="tb-keys" title="keyboard shortcuts (?)">⌘</button>
   </div>
+
+  <main id="main">
+    <nav id="rail" class="hidden"></nav>
+    <div id="editor-wrap">
+      <div id="editor"></div>
+      <div id="placeholder" hidden></div>
+    </div>
+  </main>
 
   <div id="topcard">
     <header id="header">
@@ -45,32 +44,21 @@
       </div>
       <span id="position" class="mono"></span>
       <h1 id="subject"></h1>
-      <button id="body-toggle" class="mono" hidden title="show commit body (m)">···</button>
-      <span class="spacer"></span>
-      <span id="branch" class="mono dim"></span>
     </header>
     <div id="commit-body" hidden></div>
   </div>
 
-  <main id="main">
-    <nav id="rail"></nav>
-    <div id="editor-wrap">
-      <div id="editor"></div>
-      <div id="placeholder" hidden></div>
-    </div>
-  </main>
-
-  <div id="timeline-pill"></div>
+  <div id="timeline-pill">
+    <button id="btn-prev" class="nav-btn" title="previous change (←)">‹</button>
+    <div id="scrubber" aria-label="commit timeline"></div>
+    <button id="btn-next" class="nav-btn" title="next change (→)">›</button>
+  </div>
 
   <footer id="status">
-    <div id="status-row">
-      <button id="btn-prev" class="nav-btn" title="previous change (←)">‹</button>
-      <button id="btn-next" class="nav-btn" title="next change (→)">›</button>
-      <span id="file-label" class="mono"></span>
-      <span id="change-label" class="mono dim"></span>
-      <span class="spacer"></span>
-      <span class="hint dim">←→ step · ⇧←→ commit · ? keys</span>
-    </div>
+    <span id="file-label" class="mono"></span>
+    <span id="change-label" class="mono dim"></span>
+    <span class="spacer"></span>
+    <span class="hint dim">←→ step · ⇧←→ commit · ? keys</span>
   </footer>
 
   <div id="help" hidden>
@@ -86,7 +74,6 @@
         <dt>c</dt><dd>move card to next corner</dd>
         <dt>t</dt><dd>toggle sidebar</dd>
         <dt>x</dt><dd>fold unchanged code</dd>
-        <dt>v</dt><dd>switch look</dd>
         <dt>?</dt><dd>this help</dd>
       </dl>
     </div>
