@@ -32,9 +32,12 @@ Two halves:
 As a Claude Code plugin:
 
 ```
-/plugin marketplace add /path/to/pr-timeline   (or the git repo URL)
+/plugin marketplace add jalvarado91/pr-timeline
 /plugin install pr-timeline@pr-timeline
 ```
+
+(For local development, point the marketplace at a checkout instead:
+`/plugin marketplace add /path/to/pr-timeline`.)
 
 The viewer's only dependency (monaco-editor) is installed automatically the
 first time `/pr-timeline:replay` runs, or manually with `npm install`.
