@@ -6,12 +6,16 @@ require.config({ paths: { vs: '/vs' } });
 const $ = (id) => document.getElementById(id);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const THEMES = ['clean', 'linear', 'player'];
-const EDITOR_BG = { clean: '#1a1a1d', linear: '#131316', player: '#161619' };
+const THEMES = ['player', 'clean'];
+const EDITOR_BG = { clean: '#1a1a1d', player: '#161619' };
+const CORNERS = ['tc-tr', 'tc-br', 'tc-bl', 'tc-tl'];
 const store = (() => { try { return window.localStorage; } catch { return null; } })();
 let theme = store?.getItem('prtl-theme');
-if (!THEMES.includes(theme)) theme = 'clean';
+if (!THEMES.includes(theme)) theme = 'player';
 document.body.dataset.theme = theme;
+let cardCorner = store?.getItem('prtl-corner');
+if (!CORNERS.includes(cardCorner)) cardCorner = 'tc-tr';
+let cardMin = store?.getItem('prtl-cardmin') === '1';
 
 const state = {
   timeline: null,
@@ -56,6 +60,7 @@ async function init() {
   bindKeys();
   document.title = `${state.timeline.branch} · pr-timeline`;
   $('branch').textContent = `${state.timeline.repo} · ${state.timeline.branch}`;
+  $('topbar-branch').textContent = `${state.timeline.repo} · ${state.timeline.branch}`;
 
   const start = parseHash() ?? { frame: 0, change: 0 };
   await loadFrame(start.frame, start.change);
@@ -121,7 +126,7 @@ function applyTheme(name) {
   document.body.dataset.theme = name;
   store?.setItem('prtl-theme', name);
   monacoApi?.editor.setTheme(`replay-${name}`);
-  // player mode docks the scrubber inside the playback pill and clears the
+  // player mode docks the scrubber inside the now-playing bar and clears the
   // stage: the rail becomes an on-demand overlay
   if (name === 'player') {
     $('status').prepend($('scrubber'));
@@ -130,21 +135,37 @@ function applyTheme(name) {
     document.body.insertBefore($('scrubber'), $('topcard'));
     $('rail').classList.remove('hidden');
   }
+  applyCard();
+  syncBarButtons();
   diffEditor?.updateOptions({
-    padding: name === 'player' ? { top: 96, bottom: 120 } : { top: 14 },
+    padding: name === 'player' ? { top: 48, bottom: 84 } : { top: 14 },
   });
-  anchorRail();
 }
 
-// in player mode the rail floats below the top card, whose height varies
-// with the commit body
-function anchorRail() {
-  const rail = $('rail');
+function applyCard() {
+  const card = $('topcard');
+  card.classList.remove(...CORNERS, 'min');
   if (theme === 'player') {
-    rail.style.top = `${$('topcard').getBoundingClientRect().bottom + 12}px`;
-  } else {
-    rail.style.top = '';
+    card.classList.add(cardCorner);
+    if (cardMin) card.classList.add('min');
   }
+}
+
+function cycleCorner() {
+  cardCorner = CORNERS[(CORNERS.indexOf(cardCorner) + 1) % CORNERS.length];
+  store?.setItem('prtl-corner', cardCorner);
+  applyCard();
+}
+
+function toggleCardMin(min = !cardMin) {
+  cardMin = min;
+  store?.setItem('prtl-cardmin', cardMin ? '1' : '0');
+  applyCard();
+}
+
+function syncBarButtons() {
+  $('tb-rail').classList.toggle('active', !$('rail').classList.contains('hidden'));
+  $('tb-fold').classList.toggle('active', state.foldUnchanged);
 }
 
 function cycleTheme() {
@@ -351,7 +372,6 @@ function renderChrome() {
 
   renderRailFiles();
   updateScrubber();
-  anchorRail();
 }
 
 function renderScrubber() {
@@ -480,7 +500,8 @@ function handleNavKey(e) {
     case 't': toggleRail(); return true;
     case 'x': toggleFold(); return true;
     case 'v': cycleTheme(); return true;
-    case 'm': toggleBody(); return true;
+    case 'c': if (theme === 'player') cycleCorner(); return true;
+    case 'm': theme === 'player' ? toggleCardMin() : toggleBody(); return true;
     case '?': $('help').hidden = false; return true;
     default: return false;
   }
@@ -495,10 +516,26 @@ function bindKeys() {
   $('body-toggle').addEventListener('click', toggleBody);
   $('btn-prev').addEventListener('click', prev);
   $('btn-next').addEventListener('click', next);
+  $('tb-rail').addEventListener('click', toggleRail);
+  $('tb-fold').addEventListener('click', toggleFold);
+  $('tb-look').addEventListener('click', cycleTheme);
+  $('tb-keys').addEventListener('click', () => { $('help').hidden = false; });
+  document.querySelector('.dot-min').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleCardMin();
+  });
+  document.querySelector('.dot-corner').addEventListener('click', (e) => {
+    e.stopPropagation();
+    cycleCorner();
+  });
+  $('topcard').addEventListener('click', () => {
+    if (theme === 'player' && cardMin) toggleCardMin(false);
+  });
 }
 
 function toggleRail() {
   $('rail').classList.toggle('hidden');
+  syncBarButtons();
 }
 
 function toggleFold() {
@@ -506,6 +543,7 @@ function toggleFold() {
   diffEditor.updateOptions({
     hideUnchangedRegions: { enabled: state.foldUnchanged, revealLineCount: 8, contextLineCount: 4 },
   });
+  syncBarButtons();
 }
 
 function toggleBody() {

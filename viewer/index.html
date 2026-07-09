@@ -9,8 +9,21 @@
 <body>
   <div id="scrubber" aria-label="commit timeline"></div>
 
+  <div id="topbar">
+    <span id="topbar-branch" class="mono dim"></span>
+    <span class="spacer"></span>
+    <button class="bar-btn" id="tb-rail" title="commits & files (t)">rail</button>
+    <button class="bar-btn" id="tb-fold" title="fold unchanged code (x)">fold</button>
+    <button class="bar-btn" id="tb-look" title="switch look (v)">look</button>
+    <button class="bar-btn" id="tb-keys" title="keyboard shortcuts (?)">?</button>
+  </div>
+
   <div id="topcard">
     <header id="header">
+      <div id="card-dots">
+        <button class="dot dot-min" title="minimize card (m)"></button>
+        <button class="dot dot-corner" title="move card to next corner (c)"></button>
+      </div>
       <span id="position" class="mono"></span>
       <h1 id="subject"></h1>
       <button id="body-toggle" class="mono" hidden title="show commit body (m)">···</button>
@@ -35,7 +48,7 @@
       <span id="file-label" class="mono"></span>
       <span id="change-label" class="mono dim"></span>
       <span class="spacer"></span>
-      <span class="hint dim">←→ step · ⇧←→ commit · t rail · x fold · v look · ? keys</span>
+      <span class="hint dim">←→ step · ⇧←→ commit · ? keys</span>
     </div>
   </footer>
 
@@ -48,7 +61,8 @@
         <dt>⇧→ / J</dt><dd>next commit</dd>
         <dt>⇧← / K</dt><dd>previous commit</dd>
         <dt>g / G</dt><dd>first / last commit</dd>
-        <dt>m</dt><dd>hide / show commit body</dd>
+        <dt>m</dt><dd>minimize / restore commit card</dd>
+        <dt>c</dt><dd>move card to next corner</dd>
         <dt>t</dt><dd>toggle rail</dd>
         <dt>x</dt><dd>fold unchanged code</dd>
         <dt>v</dt><dd>switch look</dd>

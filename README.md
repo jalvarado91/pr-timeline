@@ -24,13 +24,14 @@ Two halves:
   commits, `g`/`G` first/last, `?` for the rest.
 - A filmstrip scrubber up top — one segment per commit, sized by churn, one
   tick per file. Click anywhere to seek.
-- A rail with the commit list and the current commit's files. `t` hides it.
-- `x` folds unchanged regions when you want just the deltas.
-- Three looks, cycled with `v` (remembered across sessions):
-  - **clean** — quiet editor-native chrome, amber playhead (default)
-  - **linear** — cooler hairline panels, indigo accent, tighter type
-  - **player** — edge-to-edge code with a floating glass commit card and a
-    playback pill; the rail becomes an on-demand overlay
+- A rail with the commit list and the current commit's files (`t`, or the
+  `rail` button).
+- `x` (or `fold`) folds unchanged regions when you want just the deltas.
+- Two looks, cycled with `v` (remembered across sessions):
+  - **player** (default) — mac-flavored: edge-to-edge code under a glass menu
+    bar, a floating commit card with traffic-dot controls (minimize to a chip,
+    cycle corners — also `m` / `c`), and a now-playing bar holding the scrubber
+  - **clean** — quiet docked editor-native chrome
 
 ## Install
 

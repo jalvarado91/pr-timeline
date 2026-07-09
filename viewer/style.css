@@ -1,7 +1,8 @@
-/* pr-timeline viewer — three looks, one skeleton.
-   clean  : quiet editor-native chrome, amber playhead (default)
-   linear : cooler hairline panels, indigo accent, precision typography
-   player : edge-to-edge editor, floating glass commit card + playback pill */
+/* pr-timeline viewer — two looks, one skeleton.
+   player : mac-flavored stage — edge-to-edge editor, glass menu bar,
+            floating commit card with traffic-dot controls, now-playing
+            bar holding the scrubber (default)
+   clean  : quiet docked editor-native chrome */
 
 :root {
   --bg: #131315;
@@ -20,21 +21,6 @@
   --radius: 8px;
   --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
-}
-
-body[data-theme="linear"] {
-  --bg: #0f0f12;
-  --bg-editor: #131316;
-  --bg-raised: #17171b;
-  --rule: #232329;
-  --text: #dcdce2;
-  --soft: #a4a4b0;
-  --dim: #82828e;
-  --faint: #33333c;
-  --accent: #8b8bf5;
-  --accent-dim: #4c4c92;
-  --mod: #b3a04a;
-  --radius: 6px;
 }
 
 body[data-theme="player"] {
@@ -330,27 +316,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 }
 #help-card dd { font-size: 12.5px; color: var(--text); }
 
-/* ================= linear: hairline precision ================= */
-
-body[data-theme="linear"] #scrubber { height: 26px; padding: 9px 16px 5px; }
-body[data-theme="linear"] .tick { border-radius: 2px; }
-
-body[data-theme="linear"] #position {
-  font-size: 10.5px;
-  letter-spacing: 0.1em;
-}
-body[data-theme="linear"] #subject { font-size: 14px; letter-spacing: 0; }
-body[data-theme="linear"] #commit-body { font-size: 12px; }
-
-body[data-theme="linear"] .rail-commit .s { font-size: 12px; }
-body[data-theme="linear"] .rail-file.active {
-  background: none;
-  color: var(--text);
-}
-
-body[data-theme="linear"] #status-row { padding: 6px 16px; }
-
-/* ================= player: floating liquid glass ================= */
+/* ================= player: mac-flavored stage ================= */
 
 body[data-theme="player"] #main {
   position: absolute;
@@ -361,12 +327,48 @@ body[data-theme="player"] #main {
 }
 body[data-theme="player"] #editor-wrap { position: absolute; inset: 0; }
 
+body[data-theme="player"] #branch,
+body[data-theme="player"] #body-toggle { display: none; }
+
+/* --- menu bar --- */
+
+#topbar { display: none; }
+body[data-theme="player"] #topbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 34px;
+  padding: 0 10px 0 14px;
+  z-index: 30;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  backdrop-filter: blur(20px) saturate(1.5);
+  border-bottom: 1px solid var(--glass-edge);
+}
+#topbar-branch { font-size: 11px; }
+
+.bar-btn {
+  font-size: 11px;
+  color: var(--dim);
+  padding: 3px 9px;
+  border-radius: 7px;
+  line-height: 1.3;
+}
+.bar-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.09); }
+.bar-btn.active { color: var(--text); background: rgba(255, 255, 255, 0.13); }
+
+/* --- commit card: floating, corner-cycling, minimizable --- */
+
+#card-dots { display: none; }
+
 body[data-theme="player"] #topcard {
   position: fixed;
-  top: 14px;
-  left: 16px;
-  width: min(640px, calc(100vw - 32px));
-  z-index: 20;
+  width: min(400px, calc(100vw - 24px));
+  z-index: 25;
   background: var(--glass);
   -webkit-backdrop-filter: blur(20px) saturate(1.5);
   backdrop-filter: blur(20px) saturate(1.5);
@@ -375,17 +377,55 @@ body[data-theme="player"] #topcard {
   box-shadow: 0 10px 34px rgba(0, 0, 0, 0.45);
   overflow: hidden;
 }
-body[data-theme="player"] #header { padding: 11px 18px 8px; }
-body[data-theme="player"] #header:has(+ #commit-body:not([hidden])) { padding-bottom: 0; }
-body[data-theme="player"] #commit-body { padding: 6px 18px 13px; }
+body[data-theme="player"] #topcard.tc-tr { top: 44px; right: 12px; }
+body[data-theme="player"] #topcard.tc-br { bottom: 78px; right: 12px; }
+body[data-theme="player"] #topcard.tc-bl { bottom: 78px; left: 12px; }
+body[data-theme="player"] #topcard.tc-tl { top: 44px; left: 12px; }
 
-body[data-theme="player"] #branch { display: none; }
+body[data-theme="player"] #header {
+  padding: 11px 16px 8px 12px;
+  align-items: flex-start;
+}
+body[data-theme="player"] #card-dots {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding-top: 4px;
+  flex-shrink: 0;
+}
+.dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  transition: background 140ms ease;
+  padding: 0;
+}
+#topcard:hover .dot-min { background: #febc2e; }
+#topcard:hover .dot-corner { background: #28c840; }
+
+body[data-theme="player"] #position { padding-top: 1px; }
+body[data-theme="player"] #subject {
+  white-space: normal;         /* narrow card: let the subject wrap */
+  line-height: 1.35;
+  font-size: 14px;
+}
+body[data-theme="player"] #commit-body { padding: 0 16px 12px 44px; font-size: 12px; }
+
+/* minimized: a quiet chip */
+body[data-theme="player"] #topcard.min { width: auto; max-width: min(340px, calc(100vw - 24px)); cursor: pointer; }
+body[data-theme="player"] #topcard.min #subject { white-space: nowrap; font-size: 12.5px; }
+body[data-theme="player"] #topcard.min #header { padding: 8px 14px 8px 10px; align-items: center; }
+body[data-theme="player"] #topcard.min #card-dots { padding-top: 0; }
+body[data-theme="player"] #topcard.min #commit-body { display: none; }
+
+/* --- rail: on-demand glass panel --- */
 
 body[data-theme="player"] #rail {
   position: fixed;
-  left: 16px;
-  top: 108px;   /* re-anchored below the top card by applyTheme/renderChrome */
-  bottom: 96px;
+  left: 12px;
+  top: 44px;
+  bottom: 78px;
   width: 264px;
   z-index: 10;
   border-right: none;
@@ -397,35 +437,32 @@ body[data-theme="player"] #rail {
   box-shadow: 0 10px 34px rgba(0, 0, 0, 0.45);
 }
 
+/* --- now-playing bar --- */
+
 body[data-theme="player"] #status {
   position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 14px;
-  width: min(720px, calc(100vw - 32px));
-  z-index: 20;
-  border-top: none;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  border-top: 1px solid var(--glass-edge);
   background: var(--glass);
   -webkit-backdrop-filter: blur(20px) saturate(1.5);
   backdrop-filter: blur(20px) saturate(1.5);
-  border: 1px solid var(--glass-edge);
-  border-radius: 20px;
-  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.45);
-  padding: 10px 16px 9px;
+  padding: 9px 14px 7px;
 }
 body[data-theme="player"] #scrubber {
-  height: 18px;
-  padding: 0 2px 8px;
+  height: 14px;
+  padding: 0 2px 7px;
 }
 body[data-theme="player"] #status-row { padding: 0 2px; }
 body[data-theme="player"] .nav-btn {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  font-size: 17px;
+  font-size: 16px;
 }
 body[data-theme="player"] .nav-btn:hover { background: rgba(255, 255, 255, 0.1); }
-body[data-theme="player"] .hint { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .tick { transition: none; }
