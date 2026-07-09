@@ -17,6 +17,7 @@ const state = {
   models: [],
   decorations: [],
   foldUnchanged: false,
+  showBody: true,
 };
 
 let monacoApi = null;
@@ -289,10 +290,10 @@ function renderChrome() {
   const { commits } = state.timeline;
   $('position').textContent = `${fr.c + 1} / ${commits.length}`;
   $('subject').textContent = fr.commit.subject;
-  $('body-toggle').hidden = !fr.commit.body;
+  $('body-toggle').hidden = !fr.commit.body || state.showBody;
   const bodyEl = $('commit-body');
   bodyEl.textContent = fr.commit.body;
-  if (!fr.commit.body) bodyEl.hidden = true;
+  bodyEl.hidden = !fr.commit.body || !state.showBody;
 
   const dir = fr.file.path.includes('/')
     ? fr.file.path.slice(0, fr.file.path.lastIndexOf('/') + 1) : '';
@@ -459,8 +460,8 @@ function toggleFold() {
 }
 
 function toggleBody() {
-  const el = $('commit-body');
-  if (frame().commit.body) el.hidden = !el.hidden;
+  state.showBody = !state.showBody;
+  renderChrome();
 }
 
 function updateHash() {

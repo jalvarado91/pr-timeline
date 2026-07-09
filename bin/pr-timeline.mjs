@@ -155,11 +155,14 @@ const MIME = {
   '.svg': 'image/svg+xml', '.map': 'application/json', '.woff2': 'font/woff2',
 };
 
-function serveStatic(res, filePath) {
+function serveStatic(res, filePath, cacheControl = 'no-cache') {
   if (!existsSync(filePath) || !statSync(filePath).isFile()) {
     res.writeHead(404); res.end('not found'); return;
   }
-  res.writeHead(200, { 'content-type': MIME[path.extname(filePath)] ?? 'application/octet-stream' });
+  res.writeHead(200, {
+    'content-type': MIME[path.extname(filePath)] ?? 'application/octet-stream',
+    'cache-control': cacheControl,
+  });
   res.end(readFileSync(filePath));
 }
 
@@ -211,7 +214,7 @@ function main() {
       } else if (url.pathname.startsWith('/vs/')) {
         const rel = path.normalize(url.pathname.slice(4));
         if (rel.startsWith('..')) { res.writeHead(403); return res.end(); }
-        serveStatic(res, path.join(MONACO_DIR, rel));
+        serveStatic(res, path.join(MONACO_DIR, rel), 'public, max-age=86400');
       } else {
         const rel = path.normalize(url.pathname.slice(1));
         if (rel.startsWith('..')) { res.writeHead(403); return res.end(); }

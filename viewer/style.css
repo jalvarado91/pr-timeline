@@ -110,7 +110,7 @@ body { display: flex; flex-direction: column; }
 #commit-body {
   padding: 0 16px 12px 16px;
   max-width: 72ch;
-  color: var(--dim);
+  color: #a6a6ab;
   font-size: 12.5px;
   line-height: 1.55;
   white-space: pre-wrap;
