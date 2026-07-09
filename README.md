@@ -24,8 +24,8 @@ Two halves:
   commits, `g`/`G` first/last, `?` for the rest.
 - A filmstrip scrubber up top — one segment per commit, sized by churn, one
   tick per file. Click anywhere to seek.
-- A rail with the commit list and the current commit's files (`t`, or the
-  `rail` button).
+- A sidebar with the commit list and the current commit's files (`t`, or the
+  `sidebar` button).
 - `x` (or `fold`) folds unchanged regions when you want just the deltas.
 - Two looks, cycled with `v` (remembered across sessions):
   - **player** (default) — mac-flavored: edge-to-edge code under a glass menu

@@ -10,12 +10,31 @@
   <div id="scrubber" aria-label="commit timeline"></div>
 
   <div id="topbar">
-    <span id="topbar-branch" class="mono dim"></span>
+    <button class="bar-btn" id="tb-rail" title="toggle sidebar (t)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <rect x="1.7" y="2.7" width="12.6" height="10.6" rx="2"/>
+        <line x1="6.2" y1="2.7" x2="6.2" y2="13.3"/>
+      </svg>
+      sidebar
+    </button>
+    <button class="bar-btn" id="tb-fold" title="fold unchanged code (x)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="5,2.2 8,5.2 11,2.2"/>
+        <line x1="4" y1="8" x2="12" y2="8"/>
+        <polyline points="5,13.8 8,10.8 11,13.8"/>
+      </svg>
+      fold
+    </button>
+    <button class="bar-btn" id="tb-look" title="switch look (v)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <circle cx="8" cy="8" r="5.8"/>
+        <path d="M8 2.2 a5.8 5.8 0 0 1 0 11.6 Z" fill="currentColor" stroke="none"/>
+      </svg>
+      look
+    </button>
     <span class="spacer"></span>
-    <button class="bar-btn" id="tb-rail" title="commits & files (t)">rail</button>
-    <button class="bar-btn" id="tb-fold" title="fold unchanged code (x)">fold</button>
-    <button class="bar-btn" id="tb-look" title="switch look (v)">look</button>
-    <button class="bar-btn" id="tb-keys" title="keyboard shortcuts (?)">?</button>
+    <span id="topbar-branch" class="mono dim"></span>
+    <button class="bar-btn" id="tb-keys" title="keyboard shortcuts (?)">⌘</button>
   </div>
 
   <div id="topcard">
@@ -65,7 +84,7 @@
         <dt>g / G</dt><dd>first / last commit</dd>
         <dt>m</dt><dd>minimize / restore commit card</dd>
         <dt>c</dt><dd>move card to next corner</dd>
-        <dt>t</dt><dd>toggle rail</dd>
+        <dt>t</dt><dd>toggle sidebar</dd>
         <dt>x</dt><dd>fold unchanged code</dd>
         <dt>v</dt><dd>switch look</dd>
         <dt>?</dt><dd>this help</dd>
