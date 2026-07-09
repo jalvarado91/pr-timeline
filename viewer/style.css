@@ -1,0 +1,283 @@
+/* pr-timeline viewer — dark, editor-native, one amber accent (the playhead). */
+
+:root {
+  --bg: #131315;
+  --bg-editor: #1a1a1d;
+  --bg-raised: #1e1e22;
+  --rule: #26262a;
+  --text: #d6d6d3;
+  --dim: #77777d;
+  --faint: #3d3d44;
+  --accent: #e2a33d;
+  --accent-dim: #8a6526;
+  --add: #4fb469;
+  --del: #e05f5f;
+  --mod: #c9a136;
+  --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+[hidden] { display: none !important; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--ui);
+  font-size: 13px;
+}
+
+body { display: flex; flex-direction: column; }
+
+.mono { font-family: var(--mono); }
+.dim { color: var(--dim); }
+.spacer { flex: 1; }
+
+/* ---- scrubber: one segment per commit, one tick per file ---- */
+
+#scrubber {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  height: 30px;
+  padding: 9px 14px 6px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.seg {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 14px;
+}
+
+.tick {
+  flex: 1;
+  min-width: 3px;
+  border-radius: 1px;
+  background: var(--faint);
+  transition: background 120ms ease;
+}
+
+.tick.done { background: var(--accent-dim); }
+.tick.current { background: var(--accent); }
+.tick:hover { background: var(--dim); }
+.tick.current:hover { background: var(--accent); }
+
+/* ---- header ---- */
+
+#header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 16px 10px;
+  flex-shrink: 0;
+}
+
+#position {
+  color: var(--accent);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+#subject {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#body-toggle {
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--dim);
+  padding: 0 7px;
+  line-height: 16px;
+  cursor: pointer;
+}
+#body-toggle:hover { color: var(--text); border-color: var(--dim); }
+
+#branch { font-size: 11px; white-space: nowrap; }
+
+#commit-body {
+  padding: 0 16px 12px 16px;
+  max-width: 72ch;
+  color: var(--dim);
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  flex-shrink: 0;
+}
+
+/* ---- main ---- */
+
+#main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid var(--rule);
+}
+
+#rail {
+  width: 264px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--rule);
+  padding: 10px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--faint) transparent;
+}
+#rail.hidden { display: none; }
+
+.rail-commit {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  padding: 4px 14px;
+  color: var(--dim);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+.rail-commit:hover { color: var(--text); }
+.rail-commit.active {
+  color: var(--text);
+  border-left-color: var(--accent);
+}
+.rail-commit .n {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--faint);
+  min-width: 16px;
+  text-align: right;
+}
+.rail-commit.active .n { color: var(--accent); }
+.rail-commit .s {
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-files { padding: 2px 0 6px; }
+
+.rail-file {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 2px 14px 2px 39px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--dim);
+}
+.rail-file:hover { color: var(--text); }
+.rail-file.active { color: var(--text); background: var(--bg-raised); }
+.rail-file .st { width: 10px; flex-shrink: 0; }
+.st.A { color: var(--add); }
+.st.M { color: var(--mod); }
+.st.D { color: var(--del); }
+.st.R, .st.C { color: var(--dim); }
+.rail-file .p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;         /* keep the filename visible when truncating */
+  text-align: left;
+  flex: 1;
+}
+.rail-file .stat { flex-shrink: 0; font-size: 10px; }
+.stat .a { color: var(--add); }
+.stat .d { color: var(--del); }
+
+/* ---- editor ---- */
+
+#editor-wrap { flex: 1; min-width: 0; position: relative; background: var(--bg-editor); }
+#editor { position: absolute; inset: 0; }
+
+#placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--bg-editor);
+  z-index: 5;
+}
+
+/* current-change playhead inside the code */
+.playhead-line { border-left: 2px solid var(--accent) !important; }
+.playhead-glyph { background: var(--accent); width: 3px !important; margin-left: 3px; border-radius: 1px; }
+
+/* whole-file add/delete wash */
+.wash-add { background: #1f341f66; }
+.wash-del { background: #3c202066; text-decoration: line-through; text-decoration-color: #e05f5f66; }
+
+/* ---- status bar ---- */
+
+#status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 16px;
+  border-top: 1px solid var(--rule);
+  flex-shrink: 0;
+  font-size: 11px;
+}
+#file-label { color: var(--text); }
+#file-label .dir { color: var(--dim); }
+.hint { font-size: 11px; letter-spacing: 0.01em; }
+
+/* ---- help overlay ---- */
+
+#help {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 12, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+#help-card {
+  background: var(--bg-raised);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 20px 26px 22px;
+  min-width: 300px;
+}
+#help-card h2 {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--dim);
+  margin-bottom: 14px;
+}
+#help-card dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 7px 18px;
+}
+#help-card dt {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  text-align: right;
+}
+#help-card dd { font-size: 12.5px; color: var(--text); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tick { transition: none; }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "pr-timeline",
+  "version": "0.1.0",
+  "description": "Break a PR into atomic, replayable commits and step through them in an editor-grade viewer",
+  "type": "module",
+  "bin": {
+    "pr-timeline": "bin/pr-timeline.mjs"
+  },
+  "scripts": {
+    "serve": "node bin/pr-timeline.mjs serve"
+  },
+  "dependencies": {
+    "monaco-editor": "^0.52.2"
+  }
+}

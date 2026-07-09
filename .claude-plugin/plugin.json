@@ -1,0 +1,6 @@
+{
+  "name": "pr-timeline",
+  "description": "Atomize a PR or large commit into replayable atomic commits, then step through them in an editor-grade viewer",
+  "version": "0.1.0",
+  "author": { "name": "Juan Alvarado" }
+}

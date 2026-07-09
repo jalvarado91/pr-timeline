@@ -1,0 +1,11 @@
+{
+  "name": "pr-timeline",
+  "owner": { "name": "Juan Alvarado" },
+  "plugins": [
+    {
+      "name": "pr-timeline",
+      "source": "./",
+      "description": "Atomize a PR or large commit into replayable atomic commits, then step through them in an editor-grade viewer"
+    }
+  ]
+}

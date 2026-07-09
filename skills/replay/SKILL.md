@@ -1,0 +1,45 @@
+---
+name: replay
+description: Launch the pr-timeline viewer to step through a replay/<name> branch change-by-change in the browser. Use after atomize, or whenever the user wants to replay or walk through a replay branch.
+---
+
+# Replay an atomized branch
+
+Serve the pr-timeline viewer for a `replay/*` branch of the current repo.
+
+Argument: `$ARGUMENTS` may name a branch (with or without the `replay/`
+prefix); empty means the newest `replay/*` branch.
+
+## Steps
+
+1. **Ensure the viewer's dependency is installed** (first run only):
+
+   ```
+   test -d "${CLAUDE_PLUGIN_ROOT}/node_modules/monaco-editor" \
+     || npm install --prefix "${CLAUDE_PLUGIN_ROOT}" --no-audit --no-fund
+   ```
+
+2. **Resolve the branch.** If no argument, list candidates:
+
+   ```
+   git for-each-ref --sort=-committerdate --format='%(refname:short)' refs/heads/replay/
+   ```
+
+   Use the newest; if there are none, tell the user to run
+   `/pr-timeline:atomize` first.
+
+3. **Start the server in the background** (use run_in_background):
+
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/bin/pr-timeline.mjs" serve \
+     --repo <repo path> --branch <branch> [--base <sha>] --port 4820 --open
+   ```
+
+   Pass `--base` when you know the exact base commit (e.g. atomize just
+   reported it); otherwise the server auto-detects via merge-base with the
+   default branch. If the port is busy, retry with 4821, 4822, …
+
+4. **Report** the URL (`http://127.0.0.1:<port>`) and the essentials: `←`/`→`
+   step through every change, `⇧←`/`⇧→` jump commits, `t` toggles the rail,
+   `?` shows all keys. The server stays up until the session ends or the task
+   is stopped.

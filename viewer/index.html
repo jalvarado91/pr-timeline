@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pr-timeline</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="scrubber" aria-label="commit timeline"></div>
+
+  <header id="header">
+    <span id="position" class="mono"></span>
+    <h1 id="subject"></h1>
+    <button id="body-toggle" class="mono" hidden title="show commit body (m)">···</button>
+    <span class="spacer"></span>
+    <span id="branch" class="mono dim"></span>
+  </header>
+  <div id="commit-body" hidden></div>
+
+  <main id="main">
+    <nav id="rail"></nav>
+    <div id="editor-wrap">
+      <div id="editor"></div>
+      <div id="placeholder" hidden></div>
+    </div>
+  </main>
+
+  <footer id="status">
+    <span id="file-label" class="mono"></span>
+    <span id="change-label" class="mono dim"></span>
+    <span class="spacer"></span>
+    <span class="hint dim">←→ step · ⇧←→ commit · t rail · x fold · ? keys</span>
+  </footer>
+
+  <div id="help" hidden>
+    <div id="help-card">
+      <h2>keys</h2>
+      <dl>
+        <dt>→ / j</dt><dd>next change</dd>
+        <dt>← / k</dt><dd>previous change</dd>
+        <dt>⇧→ / J</dt><dd>next commit</dd>
+        <dt>⇧← / K</dt><dd>previous commit</dd>
+        <dt>g / G</dt><dd>first / last commit</dd>
+        <dt>m</dt><dd>commit message body</dd>
+        <dt>t</dt><dd>toggle rail</dd>
+        <dt>x</dt><dd>fold unchanged code</dd>
+        <dt>?</dt><dd>this help</dd>
+      </dl>
+    </div>
+  </div>
+
+<script src="/vs/loader.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
