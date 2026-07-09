@@ -26,6 +26,11 @@ Two halves:
   tick per file. Click anywhere to seek.
 - A rail with the commit list and the current commit's files. `t` hides it.
 - `x` folds unchanged regions when you want just the deltas.
+- Three looks, cycled with `v` (remembered across sessions):
+  - **clean** — quiet editor-native chrome, amber playhead (default)
+  - **linear** — cooler hairline panels, indigo accent, tighter type
+  - **player** — edge-to-edge code with a floating glass commit card and a
+    playback pill; the rail becomes an on-demand overlay
 
 ## Install
 

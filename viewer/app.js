@@ -6,6 +6,13 @@ require.config({ paths: { vs: '/vs' } });
 const $ = (id) => document.getElementById(id);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+const THEMES = ['clean', 'linear', 'player'];
+const EDITOR_BG = { clean: '#1a1a1d', linear: '#131316', player: '#161619' };
+const store = (() => { try { return window.localStorage; } catch { return null; } })();
+let theme = store?.getItem('prtl-theme');
+if (!THEMES.includes(theme)) theme = 'clean';
+document.body.dataset.theme = theme;
+
 const state = {
   timeline: null,
   frames: [],        // one frame per (commit, file), in replay order
@@ -62,25 +69,27 @@ function setupMonaco() {
       noSemanticValidation: true, noSyntaxValidation: true,
     });
   }
-  m.editor.defineTheme('replay-dark', {
-    base: 'vs-dark',
-    inherit: true,
-    rules: [],
-    colors: {
-      'editor.background': '#1a1a1d',
-      'editorGutter.background': '#1a1a1d',
-      'editorLineNumber.foreground': '#45454d',
-      'editorLineNumber.activeForeground': '#77777d',
-      'diffEditor.insertedLineBackground': '#1f341f66',
-      'diffEditor.insertedTextBackground': '#2ea04326',
-      'diffEditor.removedLineBackground': '#3c202066',
-      'diffEditor.removedTextBackground': '#e05f5f21',
-      'scrollbarSlider.background': '#3d3d4455',
-      'scrollbarSlider.hoverBackground': '#3d3d4488',
-    },
-  });
+  for (const t of THEMES) {
+    m.editor.defineTheme(`replay-${t}`, {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [],
+      colors: {
+        'editor.background': EDITOR_BG[t],
+        'editorGutter.background': EDITOR_BG[t],
+        'editorLineNumber.foreground': '#45454d',
+        'editorLineNumber.activeForeground': '#77777d',
+        'diffEditor.insertedLineBackground': '#1f341f66',
+        'diffEditor.insertedTextBackground': '#2ea04326',
+        'diffEditor.removedLineBackground': '#3c202066',
+        'diffEditor.removedTextBackground': '#e05f5f21',
+        'scrollbarSlider.background': '#3d3d4455',
+        'scrollbarSlider.hoverBackground': '#3d3d4488',
+      },
+    });
+  }
   diffEditor = m.editor.createDiffEditor($('editor'), {
-    theme: 'replay-dark',
+    theme: `replay-${theme}`,
     automaticLayout: true,
     readOnly: true,
     originalEditable: false,
@@ -104,6 +113,42 @@ function setupMonaco() {
       }
     });
   }
+  applyTheme(theme);
+}
+
+function applyTheme(name) {
+  theme = name;
+  document.body.dataset.theme = name;
+  store?.setItem('prtl-theme', name);
+  monacoApi?.editor.setTheme(`replay-${name}`);
+  // player mode docks the scrubber inside the playback pill and clears the
+  // stage: the rail becomes an on-demand overlay
+  if (name === 'player') {
+    $('status').prepend($('scrubber'));
+    $('rail').classList.add('hidden');
+  } else {
+    document.body.insertBefore($('scrubber'), $('topcard'));
+    $('rail').classList.remove('hidden');
+  }
+  diffEditor?.updateOptions({
+    padding: name === 'player' ? { top: 96, bottom: 120 } : { top: 14 },
+  });
+  anchorRail();
+}
+
+// in player mode the rail floats below the top card, whose height varies
+// with the commit body
+function anchorRail() {
+  const rail = $('rail');
+  if (theme === 'player') {
+    rail.style.top = `${$('topcard').getBoundingClientRect().bottom + 12}px`;
+  } else {
+    rail.style.top = '';
+  }
+}
+
+function cycleTheme() {
+  applyTheme(THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length]);
 }
 
 /* ---------------- navigation ---------------- */
@@ -273,7 +318,7 @@ function revealCurrent() {
       isWholeLine: true,
       linesDecorationsClassName: 'playhead-glyph',
       overviewRuler: {
-        color: '#e2a33d',
+        color: getComputedStyle(document.body).getPropertyValue('--accent').trim(),
         position: monacoApi.editor.OverviewRulerLane.Full,
       },
     },
@@ -306,6 +351,7 @@ function renderChrome() {
 
   renderRailFiles();
   updateScrubber();
+  anchorRail();
 }
 
 function renderScrubber() {
@@ -433,6 +479,7 @@ function handleNavKey(e) {
     case 'G': loadFrame(firstFrameOfCommit(state.timeline.commits.length - 1), 0); return true;
     case 't': toggleRail(); return true;
     case 'x': toggleFold(); return true;
+    case 'v': cycleTheme(); return true;
     case 'm': toggleBody(); return true;
     case '?': $('help').hidden = false; return true;
     default: return false;
@@ -446,6 +493,8 @@ function bindKeys() {
   });
   $('help').addEventListener('click', () => { $('help').hidden = true; });
   $('body-toggle').addEventListener('click', toggleBody);
+  $('btn-prev').addEventListener('click', prev);
+  $('btn-next').addEventListener('click', next);
 }
 
 function toggleRail() {

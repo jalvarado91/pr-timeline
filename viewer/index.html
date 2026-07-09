@@ -9,14 +9,16 @@
 <body>
   <div id="scrubber" aria-label="commit timeline"></div>
 
-  <header id="header">
-    <span id="position" class="mono"></span>
-    <h1 id="subject"></h1>
-    <button id="body-toggle" class="mono" hidden title="show commit body (m)">···</button>
-    <span class="spacer"></span>
-    <span id="branch" class="mono dim"></span>
-  </header>
-  <div id="commit-body" hidden></div>
+  <div id="topcard">
+    <header id="header">
+      <span id="position" class="mono"></span>
+      <h1 id="subject"></h1>
+      <button id="body-toggle" class="mono" hidden title="show commit body (m)">···</button>
+      <span class="spacer"></span>
+      <span id="branch" class="mono dim"></span>
+    </header>
+    <div id="commit-body" hidden></div>
+  </div>
 
   <main id="main">
     <nav id="rail"></nav>
@@ -27,10 +29,14 @@
   </main>
 
   <footer id="status">
-    <span id="file-label" class="mono"></span>
-    <span id="change-label" class="mono dim"></span>
-    <span class="spacer"></span>
-    <span class="hint dim">←→ step · ⇧←→ commit · t rail · x fold · ? keys</span>
+    <div id="status-row">
+      <button id="btn-prev" class="nav-btn" title="previous change (←)">‹</button>
+      <button id="btn-next" class="nav-btn" title="next change (→)">›</button>
+      <span id="file-label" class="mono"></span>
+      <span id="change-label" class="mono dim"></span>
+      <span class="spacer"></span>
+      <span class="hint dim">←→ step · ⇧←→ commit · t rail · x fold · v look · ? keys</span>
+    </div>
   </footer>
 
   <div id="help" hidden>
@@ -45,6 +51,7 @@
         <dt>m</dt><dd>hide / show commit body</dd>
         <dt>t</dt><dd>toggle rail</dd>
         <dt>x</dt><dd>fold unchanged code</dd>
+        <dt>v</dt><dd>switch look</dd>
         <dt>?</dt><dd>this help</dd>
       </dl>
     </div>
