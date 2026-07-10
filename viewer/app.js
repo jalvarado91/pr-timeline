@@ -55,6 +55,9 @@ async function init() {
   bindKeys();
   document.title = `${state.timeline.branch} · pr-timeline`;
   $('topbar-branch').textContent = `${state.timeline.repo} · ${state.timeline.branch}`;
+  const styleEl = $('topbar-style');
+  styleEl.textContent = state.timeline.style ?? '';
+  styleEl.hidden = !state.timeline.style;
 
   const start = parseHash() ?? { frame: 0, change: 0 };
   await loadFrame(start.frame, start.change);

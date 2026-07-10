@@ -54,7 +54,7 @@ function gitText(repo, args) {
 
 function tryGit(repo, args) {
   try {
-    return gitText(repo, args).trim();
+    return git(repo, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   } catch {
     return null;
   }
@@ -98,6 +98,9 @@ function loadTimeline(repo, base, branch) {
     const [sha, subject, body] = rec.split('\x1f');
     return { sha, subject, body: (body ?? '').trim(), files: [] };
   });
+  // The first commit may carry a `Narrative-Style: <id>` trailer (see atomize
+  // SKILL §4). Lift it to a branch-level field and strip it from the body.
+  const style = extractStyle(commits[0]);
   for (const commit of commits) {
     const nameStatus = gitText(repo, [
       'diff-tree', '-r', '--no-commit-id', '-M', '--name-status', '-z', commit.sha,
@@ -136,7 +139,19 @@ function loadTimeline(repo, base, branch) {
     }
     commit.files = files;
   }
-  return commits;
+  return { commits, style };
+}
+
+// Pull a trailing `Narrative-Style: <id>` line off a commit body, mutating the
+// body to drop the trailer and the blank line before it. Returns the id or null.
+function extractStyle(commit) {
+  if (!commit) return null;
+  const lines = commit.body.split('\n');
+  const m = lines[lines.length - 1]?.match(/^Narrative-Style:[ \t]*(.+?)[ \t]*$/);
+  if (!m) return null;
+  lines.pop();
+  commit.body = lines.join('\n').trimEnd();
+  return m[1];
 }
 
 function showFile(repo, ref, filePath) {
@@ -187,10 +202,10 @@ function main() {
     const url = new URL(req.url, 'http://localhost');
     try {
       if (url.pathname === '/api/timeline') {
-        const commits = loadTimeline(args.repo, base, branch);
+        const { commits, style } = loadTimeline(args.repo, base, branch);
         sendJSON(res, {
           repo: path.basename(args.repo), branch, base,
-          baseShort: base.slice(0, 7), commits,
+          baseShort: base.slice(0, 7), style, commits,
         });
       } else if (url.pathname === '/api/file') {
         const sha = url.searchParams.get('sha');
