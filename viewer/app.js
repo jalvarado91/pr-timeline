@@ -11,6 +11,7 @@ const store = (() => { try { return window.localStorage; } catch { return null; 
 let cardCorner = store?.getItem('prtl-corner');
 if (!CORNERS.includes(cardCorner)) cardCorner = 'tc-tr';
 let cardMin = store?.getItem('prtl-cardmin') === '1';
+let splitView = store?.getItem('prtl-split') === '1';
 
 const state = {
   timeline: null,
@@ -89,7 +90,8 @@ function setupMonaco() {
     automaticLayout: true,
     readOnly: true,
     originalEditable: false,
-    renderSideBySide: false,
+    renderSideBySide: splitView,
+    useInlineViewWhenSpaceIsLimited: false,   /* the toggle decides, not the width */
     minimap: { enabled: false },
     renderOverviewRuler: true,
     overviewRulerBorder: false,
@@ -135,6 +137,7 @@ function toggleCardMin(min = !cardMin) {
 function syncBarButtons() {
   $('tb-rail').classList.toggle('active', !$('rail').classList.contains('hidden'));
   $('tb-fold').classList.toggle('active', state.foldUnchanged);
+  $('tb-split').classList.toggle('active', splitView);
 }
 
 /* ---------------- navigation ---------------- */
@@ -463,6 +466,7 @@ function handleNavKey(e) {
     case 'G': loadFrame(firstFrameOfCommit(state.timeline.commits.length - 1), 0); return true;
     case 't': toggleRail(); return true;
     case 'x': toggleFold(); return true;
+    case 's': toggleSplit(); return true;
     case 'c': cycleCorner(); return true;
     case 'm': toggleCardMin(); return true;
     case '?': $('help').hidden = false; return true;
@@ -480,6 +484,7 @@ function bindKeys() {
   $('btn-next').addEventListener('click', next);
   $('tb-rail').addEventListener('click', toggleRail);
   $('tb-fold').addEventListener('click', toggleFold);
+  $('tb-split').addEventListener('click', toggleSplit);
   $('tb-keys').addEventListener('click', () => { $('help').hidden = false; });
   document.querySelector('.dot-min').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -505,6 +510,14 @@ function toggleFold() {
     hideUnchangedRegions: { enabled: state.foldUnchanged, revealLineCount: 8, contextLineCount: 4 },
   });
   syncBarButtons();
+}
+
+function toggleSplit() {
+  splitView = !splitView;
+  store?.setItem('prtl-split', splitView ? '1' : '0');
+  diffEditor.updateOptions({ renderSideBySide: splitView });
+  syncBarButtons();
+  revealCurrent();   // the modified editor is a new pane; re-anchor the playhead
 }
 
 function updateHash() {
