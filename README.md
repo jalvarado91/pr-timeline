@@ -15,6 +15,62 @@ Two halves:
   zero-dependency Node server reads everything live from git and renders it
   with Monaco.
 
+## Narrative styles
+
+`atomize` re-tells the same diff in a chosen *narrative style* — the order the
+story is told and its coherence rules. Four are built in:
+
+| id | summary |
+|----|---------|
+| `foundations-first` | Bottom-up: definitions before use, tests last. The default. |
+| `wishful-api` | Top-down: entry point first against APIs you wish existed, then descend and make each real. |
+| `tdd` | Red-green-refactor: a failing test leads each behavior slice, then the minimal code to pass it. |
+| `mvp-refine` | A crude end-to-end slice first (hardcoding named as such), then edge cases, errors, cleanup. |
+
+Pick one by naming it in the invocation — `/pr-timeline:atomize 42 tdd` — or in
+prose ("atomize this TDD-style"). No style named → `foundations-first`. Not sure?
+Ask "what styles are there?" and atomize lists them.
+
+### Add your own
+
+Drop a markdown file in `.pr-timeline/styles/<id>.md` in the repo you atomize.
+It uses the same format as the built-ins and is discovered automatically; a
+custom `id` matching a built-in shadows it. Minimal template:
+
+````markdown
+---
+id: docs-first
+name: Docs first
+summary: One line for the picker — the gist of the ordering.
+when-to-use: When this story reads better than the defaults.
+---
+
+## Ordering principles
+
+1. The rule that decides what lands before what.
+2. (3–6 total.)
+
+## Test placement
+
+Where tests fall in the sequence.
+
+## Coherence promise
+
+What every commit guarantees about the ones before it (e.g. no forward
+references, or every imagined call is made real before the end).
+
+## Example commit-list shape
+
+```
+first commit subject
+second commit subject
+```
+
+## Smells
+
+- A sign the story was told in the wrong style.
+````
+
 ## The viewer
 
 - Inline diff in a real editor: insertions green, deletions ghosted in place,
