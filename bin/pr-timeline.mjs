@@ -100,7 +100,7 @@ function loadTimeline(repo, base, branch) {
   });
   // The first commit may carry a `Narrative-Style: <id>` trailer (see atomize
   // SKILL §4). Lift it to a branch-level field and strip it from the body.
-  const style = extractStyle(commits[0]);
+  const style = extractStyle(commits);
   for (const commit of commits) {
     const nameStatus = gitText(repo, [
       'diff-tree', '-r', '--no-commit-id', '-M', '--name-status', '-z', commit.sha,
@@ -144,14 +144,16 @@ function loadTimeline(repo, base, branch) {
 
 // Pull a trailing `Narrative-Style: <id>` line off a commit body, mutating the
 // body to drop the trailer and the blank line before it. Returns the id or null.
-function extractStyle(commit) {
-  if (!commit) return null;
-  const lines = commit.body.split('\n');
-  const m = lines[lines.length - 1]?.match(/^Narrative-Style:[ \t]*(.+?)[ \t]*$/);
-  if (!m) return null;
-  lines.pop();
-  commit.body = lines.join('\n').trimEnd();
-  return m[1];
+function extractStyle(commits) {
+  for (const commit of commits) {
+    const lines = commit.body.split('\n');
+    const m = lines[lines.length - 1]?.match(/^Narrative-Style:[ \t]*(.+?)[ \t]*$/);
+    if (!m) continue;
+    lines.pop();
+    commit.body = lines.join('\n').trimEnd();
+    return m[1];
+  }
+  return null;
 }
 
 function showFile(repo, ref, filePath) {

@@ -128,14 +128,17 @@ then:
 git add -A && git commit --no-verify -m "<subject>" [-m "<body>"]
 ```
 
-Stamp the style on the branch: the **first** commit's body ends with a git-style
-trailer naming the resolved style, on its own line after a blank line:
+Stamp the style on the branch: the first commit *of the story* — the first
+feature commit, skipping any chore/housekeeping the ordering put ahead of it —
+ends its body with a git-style trailer naming the resolved style, on its own
+line after a blank line:
 
 ```
 git commit --no-verify -m "<subject>" [-m "<body>"] -m "Narrative-Style: <style-id>"
 ```
 
-The viewer reads this to show which style told the replay; it survives push.
+The viewer finds the trailer on whichever commit carries it and shows which
+style told the replay; it survives push.
 
 Rules while editing intermediate states:
 
