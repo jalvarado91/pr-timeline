@@ -30,8 +30,16 @@ is imagined anymore.
 
 ## Test placement
 
-Tests come last, once every imagined symbol is real — unless the work was
-visibly test-driven in the source history, in which case follow that.
+Tests come last, once every imagined symbol is real. If the story should be
+test-led, that's a different style — use `tdd`.
+
+## Docs and ride-alongs
+
+User-facing docs that *describe the wished-for interface* may open the story —
+they are the outermost wish of all. Reference docs and changelogs land at the
+end with the tests. Unrelated ride-along changes (a drive-by fix, housekeeping)
+sit outside the wish/descent chain entirely: give each its own terse commit
+near its file's other commits, and don't dress it up as a promise or a descent.
 
 ## Coherence promise
 
