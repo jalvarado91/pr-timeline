@@ -589,14 +589,45 @@ function handleNavKey(e) {
   }
 }
 
+/* Tap a transport button to step once; press and hold to auto-repeat. */
+function bindHold(id, fn) {
+  const btn = $(id);
+  let delayTimer = null, holding = false, viaPointer = false;
+  const stop = (e) => {
+    holding = false;
+    clearTimeout(delayTimer);
+    if (e) { try { btn.releasePointerCapture(e.pointerId); } catch { /* already gone */ } }
+  };
+  btn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    viaPointer = true;
+    holding = true;
+    btn.setPointerCapture(e.pointerId);
+    fn();                                   // immediate first step, feels responsive
+    delayTimer = setTimeout(async () => {   // then repeat, paced to load completion
+      while (holding) {
+        await fn();
+        if (!holding) break;
+        await new Promise((r) => setTimeout(r, 130));
+      }
+    }, 350);
+  });
+  btn.addEventListener('pointerup', stop);
+  btn.addEventListener('pointercancel', stop);
+  btn.addEventListener('click', () => {     // keyboard activation (Enter/Space) only
+    if (viaPointer) { viaPointer = false; return; }
+    fn();
+  });
+}
+
 function bindKeys() {
   window.addEventListener('keydown', (e) => {
     if (e.target.closest?.('input, textarea')) return;
     if (handleNavKey(e)) e.preventDefault();
   });
   $('help').addEventListener('click', () => { $('help').hidden = true; });
-  $('btn-prev').addEventListener('click', prev);
-  $('btn-next').addEventListener('click', next);
+  bindHold('btn-prev', prev);
+  bindHold('btn-next', next);
   $('tb-rail').addEventListener('click', toggleRail);
   $('tb-fold').addEventListener('click', toggleFold);
   $('tb-split').addEventListener('click', toggleSplit);
