@@ -253,7 +253,17 @@ async function loadFrame(idx, at) {
   renderChrome();
   $('change-label').textContent = '…';
 
-  const payload = await fetchFile(fr);
+  let payload;
+  try {
+    payload = await fetchFile(fr);
+  } catch (err) {
+    if (token !== state.navToken) return;
+    showPlaceholder(`couldn't load ${fr.file.path}: ${err.message ?? err}`);
+    state.changes = [];
+    state.changeIdx = 0;
+    finishFrame();
+    return;
+  }
   if (token !== state.navToken) return;
 
   disposeModels();
@@ -320,12 +330,12 @@ function waitForDiff(token) {
       sub.dispose();
       resolve(diffEditor.getLineChanges());
     });
-    setTimeout(() => {                 // safety net: never strand navigation
+    setTimeout(() => {                 // safety net: never strand navigation (big diffs are slow)
       if (token === state.navToken) {
         sub.dispose();
         resolve(diffEditor.getLineChanges() ?? []);
       }
-    }, 3000);
+    }, 8000);
   });
 }
 
