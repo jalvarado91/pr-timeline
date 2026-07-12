@@ -49,6 +49,11 @@ button {
   background: none;
   border: none;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;      /* no selection/magnifier on press-and-hold */
 }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -297,6 +302,10 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   flex: 1;
   height: 14px;
   cursor: pointer;
+  touch-action: none;        /* drag seeks the bar; don't scroll/zoom the page */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;   /* no selection/magnifier on press-and-hold */
 }
 
 .seg {
@@ -390,3 +399,94 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
   .tick { transition: none; }
 }
+
+/* ---- mobile: dock everything in-flow, nothing floats over the code ----
+   Driven by the .mobile class on <html>, set from a matchMedia query in
+   app.js so CSS and the Monaco reconfiguration never drift. */
+
+.mobile body {
+  height: 100dvh;
+  overscroll-behavior: none;
+}
+
+/* body is a flex column; place the docked pieces top→bottom explicitly */
+.mobile #topbar   { order: 0; }
+.mobile #topcard  { order: 1; }
+.mobile #main     { order: 2; }
+.mobile #status   { order: 3; }
+.mobile #timeline-pill { order: 4; }
+
+.mobile #topbar { height: 40px; gap: 4px; }
+.mobile #tb-split { display: none; }           /* unified only on a phone */
+.mobile #topbar-branch { display: none; }      /* room is scarce; branch lives elsewhere */
+
+/* sidebar becomes an overlay drawer instead of pushing the editor */
+.mobile #rail {
+  position: fixed;
+  top: 0; bottom: 0; left: 0;
+  width: 85vw; max-width: 320px;
+  z-index: 40;
+  padding-top: calc(10px + env(safe-area-inset-top));
+  background: var(--bg-raised);
+  box-shadow: 6px 0 30px rgba(0, 0, 0, 0.5);
+  transform: translateX(0);
+  transition: transform 200ms ease;
+}
+.mobile #rail.hidden { display: block; transform: translateX(-100%); }
+.mobile .rail-commit { padding: 9px 16px; }
+.mobile .rail-file { padding: 8px 16px 8px 40px; }
+
+#scrim { position: fixed; inset: 0; z-index: 35; background: rgba(0, 0, 0, 0.5); }
+
+/* commit card → compact docked strip under the app bar; tap to expand body */
+.mobile #topcard {
+  position: static;
+  width: 100%;
+  max-width: none;
+  border-radius: 0;
+  border-left: 0; border-right: 0; border-top: 0;
+  box-shadow: none;
+  background: var(--bg-raised);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.mobile #card-dots { display: none; }
+.mobile #header { flex-wrap: nowrap; align-items: baseline; gap: 10px; padding: 9px 14px; }
+.mobile #subject {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mobile #commit-body { display: none; }
+.mobile #topcard.expanded #subject { white-space: normal; }
+.mobile #topcard.expanded #commit-body { display: block; }
+
+/* timeline pill → full-width docked transport bar in the thumb zone */
+.mobile #timeline-pill {
+  position: static;
+  transform: none;
+  width: 100%;
+  max-width: none;
+  border-radius: 0;
+  border-left: 0; border-right: 0; border-bottom: 0;
+  box-shadow: none;
+  background: var(--bg-raised);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  gap: 12px;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+}
+.mobile #timeline-pill .nav-btn {
+  width: 46px;
+  height: 46px;
+  font-size: 24px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+.mobile #btn-next { background: rgba(226, 163, 61, 0.16); color: var(--accent); }
+/* content-box: keep the 22px filmstrip look but pad the touch area to ~44px */
+.mobile #scrubber { box-sizing: content-box; height: 22px; padding: 11px 0; min-width: 0; }
+.mobile .seg { min-width: 6px; }
+
+.mobile #status .hint { display: none; }       /* keyboard hints are meaningless on touch */

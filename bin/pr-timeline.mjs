@@ -22,18 +22,21 @@ options:
   --base <ref>      commit the replay starts from (default: merge-base with the
                     default branch)
   --port <n>        port to listen on (default: 4820)
+  --host <addr>     interface to bind (default: 127.0.0.1; use 0.0.0.0 to
+                    expose on your LAN)
   --open            open the viewer in a browser`);
   process.exit(code);
 }
 
 function parseArgs(argv) {
-  const args = { repo: process.cwd(), port: 4820, open: false };
+  const args = { repo: process.cwd(), port: 4820, host: '127.0.0.1', open: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--repo') args.repo = path.resolve(argv[++i]);
     else if (a === '--branch') args.branch = argv[++i];
     else if (a === '--base') args.base = argv[++i];
     else if (a === '--port') args.port = Number(argv[++i]);
+    else if (a === '--host') args.host = argv[++i];
     else if (a === '--open') args.open = true;
     else if (a === '-h' || a === '--help') usage();
     else usage(1);
@@ -242,8 +245,8 @@ function main() {
     }
   });
 
-  server.listen(args.port, '127.0.0.1', () => {
-    const addr = `http://127.0.0.1:${args.port}`;
+  server.listen(args.port, args.host, () => {
+    const addr = `http://${args.host}:${args.port}`;
     console.log(`pr-timeline: replaying ${branch} (${base.slice(0, 7)}..) from ${args.repo}`);
     console.log(`  ${addr}`);
     if (args.open) {

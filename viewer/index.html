@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>pr-timeline</title>
 <link rel="stylesheet" href="/style.css">
 </head>
@@ -30,11 +30,21 @@
       </svg>
       split
     </button>
+    <button class="bar-btn" id="tb-wrap" title="wrap long lines (w)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="2.2" y1="4" x2="13.8" y2="4"/>
+        <path d="M2.2 8H11a2 2 0 1 1 0 4H7"/>
+        <polyline points="8.4 10.2 6.6 12 8.4 13.8"/>
+      </svg>
+      wrap
+    </button>
     <span class="spacer"></span>
     <span id="topbar-style" title="narrative style" hidden></span>
     <span id="topbar-branch" class="mono dim"></span>
     <button class="bar-btn" id="tb-keys" title="keyboard shortcuts (?)">⌘</button>
   </div>
+
+  <div id="scrim" hidden></div>
 
   <main id="main">
     <nav id="rail"></nav>
@@ -83,6 +93,7 @@
         <dt>t</dt><dd>toggle sidebar</dd>
         <dt>x</dt><dd>fold unchanged code</dd>
         <dt>s</dt><dd>split / unified diff</dd>
+        <dt>w</dt><dd>wrap long lines</dd>
         <dt>?</dt><dd>this help</dd>
       </dl>
     </div>

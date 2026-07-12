@@ -6,12 +6,20 @@ require.config({ paths: { vs: '/vs' } });
 const $ = (id) => document.getElementById(id);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+// One source of truth for "is this a touch/phone layout": drives both the
+// .mobile CSS class and Monaco's options, so the two can never disagree.
+const mobileMq = matchMedia('(max-width: 768px), ((pointer: coarse) and (max-width: 1024px))');
+const isMobile = () => mobileMq.matches;
+
 const CORNERS = ['tc-tr', 'tc-br', 'tc-bl', 'tc-tl'];
 const store = (() => { try { return window.localStorage; } catch { return null; } })();
 let cardCorner = store?.getItem('prtl-corner');
 if (!CORNERS.includes(cardCorner)) cardCorner = 'tc-tr';
 let cardMin = store?.getItem('prtl-cardmin') === '1';
 let splitView = store?.getItem('prtl-split') === '1';
+// wrap defaults to the form factor (on for phones) until the user toggles it
+const wrapStored = store?.getItem('prtl-wrap');
+let wrapLines = wrapStored == null ? isMobile() : wrapStored === '1';
 
 const state = {
   timeline: null,
@@ -115,7 +123,64 @@ function setupMonaco() {
     });
   }
   applyCard();
+  applyEditorMode();
+  mobileMq.addEventListener('change', applyEditorMode);
+}
+
+/* Reconfigure Monaco and the layout for the current form factor. Called at
+   setup and whenever the mobile breakpoint is crossed (e.g. rotation). */
+function applyEditorMode() {
+  const mobile = isMobile();
+  document.documentElement.classList.toggle('mobile', mobile);
+  // fold unchanged regions by default on a phone (right density), off on desktop
+  state.foldUnchanged = mobile;
+  // sidebar overlays on mobile and starts closed; on desktop it's docked open
+  $('rail').classList.toggle('hidden', mobile);
+  $('scrim').hidden = true;
+  diffEditor.updateOptions(editorModeOptions());
+  applyFold();
+  applyWrap();
   syncBarButtons();
+  if (state.changes.length) revealCurrent();   // panes/layout changed; re-anchor
+}
+
+function editorModeOptions() {
+  if (isMobile()) return {
+    renderSideBySide: false,             // unified only; the split toggle is hidden
+    fontSize: 12,
+    lineHeight: 19,
+    lineNumbersMinChars: 3,
+    folding: false,
+    glyphMargin: false,
+    contextmenu: false,
+    selectionHighlight: false,
+    occurrencesHighlight: 'off',
+    padding: { top: 8, bottom: 16 },     // bars are docked in-flow, not floating
+  };
+  return {
+    renderSideBySide: splitView,
+    fontSize: 13,
+    lineHeight: 21,
+    lineNumbersMinChars: 5,
+    folding: true,
+    glyphMargin: true,
+    contextmenu: true,
+    selectionHighlight: true,
+    occurrencesHighlight: 'singleFile',
+    padding: { top: 14, bottom: 72 },    // clear the floating timeline pill
+  };
+}
+
+function applyFold() {
+  diffEditor.updateOptions({
+    hideUnchangedRegions: {
+      enabled: state.foldUnchanged, revealLineCount: 8, contextLineCount: 4,
+    },
+  });
+}
+
+function applyWrap() {
+  diffEditor.updateOptions({ wordWrap: wrapLines ? 'on' : 'off' });
 }
 
 function applyCard() {
@@ -141,6 +206,7 @@ function syncBarButtons() {
   $('tb-rail').classList.toggle('active', !$('rail').classList.contains('hidden'));
   $('tb-fold').classList.toggle('active', state.foldUnchanged);
   $('tb-split').classList.toggle('active', splitView);
+  $('tb-wrap').classList.toggle('active', wrapLines);
 }
 
 /* ---------------- navigation ---------------- */
@@ -347,25 +413,69 @@ function renderChrome() {
 function renderScrubber() {
   const el = $('scrubber');
   el.innerHTML = '';
-  state.timeline.commits.forEach((commit, c) => {
+  let fi = 0;                              // flat frame index, matches state.frames order
+  state.timeline.commits.forEach((commit) => {
     const seg = document.createElement('div');
     seg.className = 'seg';
     const churn = commit.files.reduce(
       (sum, f) => sum + (f.additions ?? 0) + (f.deletions ?? 0), 0);
     seg.style.flexGrow = String(Math.sqrt(Math.max(churn, 1)));
-    commit.files.forEach((file, f) => {
+    commit.files.forEach((file) => {
       const tick = document.createElement('div');
       tick.className = 'tick';
       tick.title = `${commit.subject}\n${file.path}`;
-      tick.addEventListener('click', () => {
-        loadFrame(state.frames.findIndex((fr) => fr.c === c && fr.f === f), 0);
-      });
+      tick.dataset.frame = String(fi++);
       seg.appendChild(tick);
     });
     if (!commit.files.length) seg.appendChild(document.createElement('div')).className = 'tick';
     el.appendChild(seg);
   });
+  bindScrubberDrag();
   updateScrubber();
+}
+
+/* Press-and-drag anywhere on the bar to seek live to the change under the
+   pointer. Works for touch and mouse; a tap is just a zero-length drag. */
+let scrubbing = false;
+let scrubCenters = [];      // [{frame, x}] cached at drag start; layout is stable mid-drag
+let scrubLastFrame = -1;
+
+function bindScrubberDrag() {
+  const el = $('scrubber');
+  if (el.dataset.dragBound) return;       // bind once; renderScrubber only clears children
+  el.dataset.dragBound = '1';
+
+  const seek = (clientX) => {
+    let best = -1, bestDist = Infinity;
+    for (const c of scrubCenters) {
+      const d = Math.abs(c.x - clientX);
+      if (d < bestDist) { bestDist = d; best = c.frame; }
+    }
+    if (best < 0 || best === scrubLastFrame) return;
+    scrubLastFrame = best;
+    loadFrame(best, 0);
+  };
+
+  el.addEventListener('pointerdown', (e) => {
+    scrubCenters = [...el.querySelectorAll('.tick[data-frame]')].map((t) => {
+      const r = t.getBoundingClientRect();
+      return { frame: Number(t.dataset.frame), x: r.left + r.width / 2 };
+    });
+    if (!scrubCenters.length) return;
+    scrubbing = true;
+    scrubLastFrame = -1;
+    el.setPointerCapture(e.pointerId);
+    seek(e.clientX);
+    e.preventDefault();
+  });
+  el.addEventListener('pointermove', (e) => { if (scrubbing) seek(e.clientX); });
+  const end = (e) => {
+    if (!scrubbing) return;
+    scrubbing = false;
+    try { el.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
 }
 
 function updateScrubber() {
@@ -396,7 +506,7 @@ function renderRailCommits() {
     s.textContent = commit.subject;
     s.title = commit.subject;
     row.append(n, s);
-    row.addEventListener('click', () => loadFrame(firstFrameOfCommit(c), 0));
+    row.addEventListener('click', () => { loadFrame(firstFrameOfCommit(c), 0); closeRailIfMobile(); });
     rail.appendChild(row);
     const files = document.createElement('div');
     files.className = 'rail-files';
@@ -438,6 +548,7 @@ function renderRailFiles() {
         row.append(st, p, stat);
         row.addEventListener('click', () => {
           loadFrame(state.frames.findIndex((x) => x.c === fr.c && x.f === f), 0);
+          closeRailIfMobile();
         });
         box.appendChild(row);
       });
@@ -470,11 +581,43 @@ function handleNavKey(e) {
     case 't': toggleRail(); return true;
     case 'x': toggleFold(); return true;
     case 's': toggleSplit(); return true;
+    case 'w': toggleWrap(); return true;
     case 'c': cycleCorner(); return true;
     case 'm': toggleCardMin(); return true;
     case '?': $('help').hidden = false; return true;
     default: return false;
   }
+}
+
+/* Tap a transport button to step once; press and hold to auto-repeat. */
+function bindHold(id, fn) {
+  const btn = $(id);
+  let delayTimer = null, holding = false, viaPointer = false;
+  const stop = (e) => {
+    holding = false;
+    clearTimeout(delayTimer);
+    if (e) { try { btn.releasePointerCapture(e.pointerId); } catch { /* already gone */ } }
+  };
+  btn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    viaPointer = true;
+    holding = true;
+    btn.setPointerCapture(e.pointerId);
+    fn();                                   // immediate first step, feels responsive
+    delayTimer = setTimeout(async () => {   // then repeat, paced to load completion
+      while (holding) {
+        await fn();
+        if (!holding) break;
+        await new Promise((r) => setTimeout(r, 130));
+      }
+    }, 350);
+  });
+  btn.addEventListener('pointerup', stop);
+  btn.addEventListener('pointercancel', stop);
+  btn.addEventListener('click', () => {     // keyboard activation (Enter/Space) only
+    if (viaPointer) { viaPointer = false; return; }
+    fn();
+  });
 }
 
 function bindKeys() {
@@ -483,11 +626,12 @@ function bindKeys() {
     if (handleNavKey(e)) e.preventDefault();
   });
   $('help').addEventListener('click', () => { $('help').hidden = true; });
-  $('btn-prev').addEventListener('click', prev);
-  $('btn-next').addEventListener('click', next);
+  bindHold('btn-prev', prev);
+  bindHold('btn-next', next);
   $('tb-rail').addEventListener('click', toggleRail);
   $('tb-fold').addEventListener('click', toggleFold);
   $('tb-split').addEventListener('click', toggleSplit);
+  $('tb-wrap').addEventListener('click', toggleWrap);
   $('tb-keys').addEventListener('click', () => { $('help').hidden = false; });
   document.querySelector('.dot-min').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -498,29 +642,47 @@ function bindKeys() {
     cycleCorner();
   });
   $('topcard').addEventListener('click', () => {
+    if (isMobile()) { $('topcard').classList.toggle('expanded'); return; }
     if (cardMin) toggleCardMin(false);
   });
+  $('scrim').addEventListener('click', closeRailIfMobile);
 }
 
 function toggleRail() {
+  const opening = $('rail').classList.contains('hidden');
   $('rail').classList.toggle('hidden');
+  $('scrim').hidden = !(isMobile() && opening);   // scrim only backs the mobile drawer
+  syncBarButtons();
+}
+
+function closeRailIfMobile() {
+  if (!isMobile()) return;
+  $('rail').classList.add('hidden');
+  $('scrim').hidden = true;
   syncBarButtons();
 }
 
 function toggleFold() {
   state.foldUnchanged = !state.foldUnchanged;
-  diffEditor.updateOptions({
-    hideUnchangedRegions: { enabled: state.foldUnchanged, revealLineCount: 8, contextLineCount: 4 },
-  });
+  applyFold();
   syncBarButtons();
 }
 
 function toggleSplit() {
+  if (isMobile()) return;                // unified is forced on a phone
   splitView = !splitView;
   store?.setItem('prtl-split', splitView ? '1' : '0');
   diffEditor.updateOptions({ renderSideBySide: splitView });
   syncBarButtons();
   revealCurrent();   // the modified editor is a new pane; re-anchor the playhead
+}
+
+function toggleWrap() {
+  wrapLines = !wrapLines;
+  store?.setItem('prtl-wrap', wrapLines ? '1' : '0');
+  applyWrap();
+  syncBarButtons();
+  revealCurrent();   // wrapping shifts line positions; keep the playhead in view
 }
 
 function updateHash() {
