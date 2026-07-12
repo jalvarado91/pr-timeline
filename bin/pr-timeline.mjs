@@ -5,7 +5,7 @@
 import http from 'node:http';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync, statSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -47,6 +47,7 @@ function parseArgs(argv) {
 function git(repo, args, opts = {}) {
   return execFileSync('git', ['-C', repo, ...args], {
     maxBuffer: 256 * 1024 * 1024,
+    timeout: 30000,   // bound a hung git (credential prompt, dead mount) — every call is synchronous
     ...opts,
   });
 }
@@ -191,11 +192,28 @@ function sendJSON(res, data, status = 200) {
   res.end(JSON.stringify(data));
 }
 
+// DNS-rebinding guard. On the loopback default, a malicious page can rebind a
+// hostname it controls to 127.0.0.1 and read the API from the user's browser;
+// requiring an IP-literal or localhost Host defeats that (direct access always
+// uses one). When the user explicitly binds a non-loopback --host they've opted
+// into network exposure, so we allow any Host (e.g. Tailscale MagicDNS names).
+function hostAllowed(bindHost, hostHeader) {
+  const loopbackBind = ['127.0.0.1', 'localhost', '::1'].includes(bindHost);
+  if (!loopbackBind) return true;
+  if (!hostHeader) return true;
+  const name = hostHeader.replace(/:\d+$/, '').toLowerCase();
+  return name === 'localhost' || name === '::1' || name.startsWith('[')
+    || /^\d{1,3}(\.\d{1,3}){3}$/.test(name);
+}
+
 function main() {
   const [cmd, ...rest] = process.argv.slice(2);
   if (cmd !== 'serve') usage(cmd ? 1 : 0);
   const args = parseArgs(rest);
 
+  if (!Number.isInteger(args.port) || args.port <= 0 || args.port > 65535) {
+    fail(`invalid --port: ${args.port} (expected 1–65535)`);
+  }
   if (tryGit(args.repo, ['rev-parse', '--git-dir']) === null) fail(`not a git repository: ${args.repo}`);
   const branch = resolveBranch(args.repo, args.branch);
   if (tryGit(args.repo, ['rev-parse', '--verify', '--quiet', `${branch}^{commit}`]) === null) {
@@ -203,9 +221,16 @@ function main() {
   }
   const base = resolveBase(args.repo, branch, args.base);
 
+  if (!existsSync(MONACO_DIR)) {
+    fail(`monaco-editor is not installed — the viewer can't render.\n  install it with: npm install --prefix "${ROOT}"`);
+  }
+
   const server = http.createServer((req, res) => {
-    const url = new URL(req.url, 'http://localhost');
     try {
+      if (!hostAllowed(args.host, req.headers.host)) {
+        res.writeHead(403); return res.end('forbidden host');
+      }
+      const url = new URL(req.url, 'http://localhost');   // may throw on odd targets
       if (url.pathname === '/api/timeline') {
         const { commits, style } = loadTimeline(args.repo, base, branch);
         sendJSON(res, {
@@ -241,8 +266,14 @@ function main() {
         serveStatic(res, path.join(VIEWER_DIR, rel));
       }
     } catch (err) {
+      if (res.headersSent) return res.end();   // a response already started; don't double-send
       sendJSON(res, { error: String(err.message ?? err) }, 500);
     }
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') fail(`port ${args.port} is in use — retry with --port <n>`);
+    fail(String(err.message ?? err));
   });
 
   server.listen(args.port, args.host, () => {
@@ -257,4 +288,7 @@ function main() {
   });
 }
 
-main();
+// Run the server only when invoked directly, so tests can import the parsers.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
+
+export { loadTimeline, extractStyle };
