@@ -6,12 +6,20 @@ require.config({ paths: { vs: '/vs' } });
 const $ = (id) => document.getElementById(id);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+// One source of truth for "is this a touch/phone layout": drives both the
+// .mobile CSS class and Monaco's options, so the two can never disagree.
+const mobileMq = matchMedia('(max-width: 768px), ((pointer: coarse) and (max-width: 1024px))');
+const isMobile = () => mobileMq.matches;
+
 const CORNERS = ['tc-tr', 'tc-br', 'tc-bl', 'tc-tl'];
 const store = (() => { try { return window.localStorage; } catch { return null; } })();
 let cardCorner = store?.getItem('prtl-corner');
 if (!CORNERS.includes(cardCorner)) cardCorner = 'tc-tr';
 let cardMin = store?.getItem('prtl-cardmin') === '1';
 let splitView = store?.getItem('prtl-split') === '1';
+// wrap defaults to the form factor (on for phones) until the user toggles it
+const wrapStored = store?.getItem('prtl-wrap');
+let wrapLines = wrapStored == null ? isMobile() : wrapStored === '1';
 
 const state = {
   timeline: null,
@@ -115,7 +123,64 @@ function setupMonaco() {
     });
   }
   applyCard();
+  applyEditorMode();
+  mobileMq.addEventListener('change', applyEditorMode);
+}
+
+/* Reconfigure Monaco and the layout for the current form factor. Called at
+   setup and whenever the mobile breakpoint is crossed (e.g. rotation). */
+function applyEditorMode() {
+  const mobile = isMobile();
+  document.documentElement.classList.toggle('mobile', mobile);
+  // fold unchanged regions by default on a phone (right density), off on desktop
+  state.foldUnchanged = mobile;
+  // sidebar overlays on mobile and starts closed; on desktop it's docked open
+  $('rail').classList.toggle('hidden', mobile);
+  $('scrim').hidden = true;
+  diffEditor.updateOptions(editorModeOptions());
+  applyFold();
+  applyWrap();
   syncBarButtons();
+  if (state.changes.length) revealCurrent();   // panes/layout changed; re-anchor
+}
+
+function editorModeOptions() {
+  if (isMobile()) return {
+    renderSideBySide: false,             // unified only; the split toggle is hidden
+    fontSize: 12,
+    lineHeight: 19,
+    lineNumbersMinChars: 3,
+    folding: false,
+    glyphMargin: false,
+    contextmenu: false,
+    selectionHighlight: false,
+    occurrencesHighlight: 'off',
+    padding: { top: 8, bottom: 16 },     // bars are docked in-flow, not floating
+  };
+  return {
+    renderSideBySide: splitView,
+    fontSize: 13,
+    lineHeight: 21,
+    lineNumbersMinChars: 5,
+    folding: true,
+    glyphMargin: true,
+    contextmenu: true,
+    selectionHighlight: true,
+    occurrencesHighlight: 'singleFile',
+    padding: { top: 14, bottom: 72 },    // clear the floating timeline pill
+  };
+}
+
+function applyFold() {
+  diffEditor.updateOptions({
+    hideUnchangedRegions: {
+      enabled: state.foldUnchanged, revealLineCount: 8, contextLineCount: 4,
+    },
+  });
+}
+
+function applyWrap() {
+  diffEditor.updateOptions({ wordWrap: wrapLines ? 'on' : 'off' });
 }
 
 function applyCard() {
@@ -141,6 +206,7 @@ function syncBarButtons() {
   $('tb-rail').classList.toggle('active', !$('rail').classList.contains('hidden'));
   $('tb-fold').classList.toggle('active', state.foldUnchanged);
   $('tb-split').classList.toggle('active', splitView);
+  $('tb-wrap').classList.toggle('active', wrapLines);
 }
 
 /* ---------------- navigation ---------------- */
@@ -396,7 +462,7 @@ function renderRailCommits() {
     s.textContent = commit.subject;
     s.title = commit.subject;
     row.append(n, s);
-    row.addEventListener('click', () => loadFrame(firstFrameOfCommit(c), 0));
+    row.addEventListener('click', () => { loadFrame(firstFrameOfCommit(c), 0); closeRailIfMobile(); });
     rail.appendChild(row);
     const files = document.createElement('div');
     files.className = 'rail-files';
@@ -438,6 +504,7 @@ function renderRailFiles() {
         row.append(st, p, stat);
         row.addEventListener('click', () => {
           loadFrame(state.frames.findIndex((x) => x.c === fr.c && x.f === f), 0);
+          closeRailIfMobile();
         });
         box.appendChild(row);
       });
@@ -470,6 +537,7 @@ function handleNavKey(e) {
     case 't': toggleRail(); return true;
     case 'x': toggleFold(); return true;
     case 's': toggleSplit(); return true;
+    case 'w': toggleWrap(); return true;
     case 'c': cycleCorner(); return true;
     case 'm': toggleCardMin(); return true;
     case '?': $('help').hidden = false; return true;
@@ -488,6 +556,7 @@ function bindKeys() {
   $('tb-rail').addEventListener('click', toggleRail);
   $('tb-fold').addEventListener('click', toggleFold);
   $('tb-split').addEventListener('click', toggleSplit);
+  $('tb-wrap').addEventListener('click', toggleWrap);
   $('tb-keys').addEventListener('click', () => { $('help').hidden = false; });
   document.querySelector('.dot-min').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -498,29 +567,47 @@ function bindKeys() {
     cycleCorner();
   });
   $('topcard').addEventListener('click', () => {
+    if (isMobile()) { $('topcard').classList.toggle('expanded'); return; }
     if (cardMin) toggleCardMin(false);
   });
+  $('scrim').addEventListener('click', closeRailIfMobile);
 }
 
 function toggleRail() {
+  const opening = $('rail').classList.contains('hidden');
   $('rail').classList.toggle('hidden');
+  $('scrim').hidden = !(isMobile() && opening);   // scrim only backs the mobile drawer
+  syncBarButtons();
+}
+
+function closeRailIfMobile() {
+  if (!isMobile()) return;
+  $('rail').classList.add('hidden');
+  $('scrim').hidden = true;
   syncBarButtons();
 }
 
 function toggleFold() {
   state.foldUnchanged = !state.foldUnchanged;
-  diffEditor.updateOptions({
-    hideUnchangedRegions: { enabled: state.foldUnchanged, revealLineCount: 8, contextLineCount: 4 },
-  });
+  applyFold();
   syncBarButtons();
 }
 
 function toggleSplit() {
+  if (isMobile()) return;                // unified is forced on a phone
   splitView = !splitView;
   store?.setItem('prtl-split', splitView ? '1' : '0');
   diffEditor.updateOptions({ renderSideBySide: splitView });
   syncBarButtons();
   revealCurrent();   // the modified editor is a new pane; re-anchor the playhead
+}
+
+function toggleWrap() {
+  wrapLines = !wrapLines;
+  store?.setItem('prtl-wrap', wrapLines ? '1' : '0');
+  applyWrap();
+  syncBarButtons();
+  revealCurrent();   // wrapping shifts line positions; keep the playhead in view
 }
 
 function updateHash() {
