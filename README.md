@@ -18,7 +18,7 @@ Two halves:
 ## Narrative styles
 
 `atomize` re-tells the same diff in a chosen *narrative style* — the order the
-story is told and its coherence rules. Four are built in:
+story is told and its coherence rules. Three are built in:
 
 | id | summary |
 |----|---------|
@@ -29,6 +29,10 @@ story is told and its coherence rules. Four are built in:
 Pick one by naming it in the invocation — `/pr-timeline:atomize 42 wishful-api` — or in
 prose ("atomize this top-down"). No style named → `foundations-first`. Not sure?
 Ask "what styles are there?" and atomize lists them.
+
+Only the final commit is guaranteed byte-identical to the source head — the
+intermediate commits are a narrative, not a CI-green history. Some styles (e.g.
+`wishful-api`) deliberately produce mid-replay trees that don't compile.
 
 ### Add your own
 
@@ -99,8 +103,23 @@ As a Claude Code plugin:
 (For local development, point the marketplace at a checkout instead:
 `/plugin marketplace add /path/to/pr-timeline`.)
 
-The viewer's only dependency (monaco-editor) is installed automatically the
-first time `/pr-timeline:replay` runs, or manually with `npm install`.
+**Requirements:** `node ≥ 18` and `git` on your `PATH`. The viewer's only
+dependency (monaco-editor) is installed automatically the first time
+`/pr-timeline:replay` runs, or manually with `npm install`.
+
+### Updating
+
+This repo is its own marketplace, so pr-timeline is distributed straight from
+GitHub. Third-party marketplaces don't auto-update — when a new version lands,
+pull it explicitly:
+
+```
+/plugin marketplace update pr-timeline
+/plugin update pr-timeline@pr-timeline
+```
+
+then restart Claude Code. (CLI equivalents: `claude plugin marketplace update
+pr-timeline` and `claude plugin update pr-timeline@pr-timeline`.)
 
 ## Standalone use
 
@@ -108,11 +127,18 @@ The viewer works on any branch whose commits you want to walk, not just
 generated ones:
 
 ```
-node bin/pr-timeline.mjs serve --repo <path> --branch <name> [--base <ref>] [--port 4820] [--open]
+node bin/pr-timeline.mjs serve --repo <path> --branch <name> [--base <ref>] [--port 4820] [--host <addr>] [--open]
 ```
 
 `--branch` defaults to the newest `replay/*` branch; `--base` defaults to the
 merge-base with the default branch.
+
+> **`--host` exposes the whole repo, unauthenticated.** By default the server
+> binds `127.0.0.1` (loopback only). Passing `--host 0.0.0.0` (or a specific
+> interface) makes it reachable from your network — and it serves **read-only
+> access to every file in the repository's git history**, with no authentication,
+> to anyone who can reach the port. Only use it on networks you trust, and stop
+> the server when you're done.
 
 ## Layout
 
