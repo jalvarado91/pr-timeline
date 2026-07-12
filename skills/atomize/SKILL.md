@@ -1,14 +1,15 @@
 ---
 name: atomize
-description: Break a PR, large commit, or ref range into atomic commits on a replay/<name> branch — ordered as the code would plausibly have been written, with terse commit messages. Use when the user wants to atomize, decompose, split, or "make replayable" a large diff.
+description: Break a PR, large commit, or ref range into atomic commits on a replay/<name> branch — ordered as the code would plausibly have been written, in a chosen narrative style (foundations-first by default, or wishful-API/mvp-refine/etc.), with terse commit messages. Use when the user wants to atomize, decompose, split, or "make replayable" a large diff, optionally in a named narrative style.
 ---
 
 # Atomize a diff into replayable commits
 
 Take one large diff and re-tell it as a sequence of small commits that reads like
-the code being written: foundations first, then logic, then integration, then
-tests. The result is a real branch named `replay/<name>` whose final tree is
-**byte-identical** to the source head. The user replays it with
+the code being written. How the story is ordered is set by a *narrative style*
+(§3a) — by default `foundations-first`: definitions first, then logic, then
+integration, then tests. The result is a real branch named `replay/<name>` whose
+final tree is **byte-identical** to the source head. The user replays it with
 `/pr-timeline:replay`.
 
 Argument: `$ARGUMENTS` may be a PR number/URL, a commit SHA, a ref range
@@ -42,25 +43,59 @@ For anything non-trivial also read the final versions of the key changed files
 (`git show HEAD:<path>`) — you are about to reconstruct their intermediate
 states, so you need the destination in full, not just hunks.
 
-## 3. Plan the story
+## 3a. Pick the style
 
-Partition the diff into ordered steps. Each step is one commit. Ordering
-principles, in priority order:
+A *narrative style* decides ordering and the coherence promise — the shape of
+the story. Resolve one before planning:
 
-1. **Definitions before use.** Types, interfaces, schemas, constants, config →
-   helpers → core logic → call sites / wiring → cleanup of what was replaced →
-   tests and docs last (unless the work was visibly test-driven).
-2. **One idea per commit.** A reviewer should be able to say what the commit
-   does in one short sentence. If your draft message contains "and", split it.
-3. **Files may evolve across steps.** A file appearing in several commits with
-   partial content is the point — e.g. a module gains its types in step 1, its
-   core function in step 3, an edge case in step 5.
-4. **Don't over-split.** A mechanical rename, a lockfile, or a formatting sweep
-   is one commit no matter how many files it touches. Typical output is 5–15
-   commits; a small PR may honestly be 3.
-5. Every step's tree should be *conceptually* coherent (would plausibly
-   compile). Perfection is not required, but never reference a symbol that a
-   later commit introduces.
+1. **Explicit** — a style named in `$ARGUMENTS` (`... wishful-api`, `... style=mvp-refine`)
+   or in prose ("atomize this top-down").
+2. **Repo-local** — `.pr-timeline/styles/*.md` in the *target* repo (the one
+   being atomized, not this plugin), each with the same frontmatter + sections
+   as a built-in. A repo-local style shadows a built-in of the same `id`.
+3. **Built-in** — `styles/*.md` in this skill's dir.
+4. **Fuzzy match** — match the request against style `id`, `name`, and `summary`
+   across both dirs; a repo-local style wins ties with a built-in.
+5. **Default** — `foundations-first` when nothing is named. This is today's
+   behavior.
+
+If the user *described* a style in prose that matches no file — words that read
+as how to order the story ("smallest diffs first", "group by subsystem") — use
+their description directly as the style ("in the style of: <their words>"). For
+the §4 trailer, distill a kebab-case `<style-id>` from that description (≤ 3–4
+words, e.g. "smallest diffs first" → `smallest-diffs-first`); it is just a viewer
+badge label — nothing resolves it back to a file.
+
+**List, don't guess, when asked or at a dead end.** Enumerate the available
+styles and ask which to use when either:
+
+- the user asks what styles exist ("what styles are there?", "atomize with —
+  hmm, what are my options?"), or
+- they name a style that matches no file *and* whose words don't read as a prose
+  description of an ordering (a bare unknown token like `style=foo`).
+
+To enumerate, read the frontmatter of every `.pr-timeline/styles/*.md` (target
+repo) then `styles/*.md` (this skill), and list each as `id — summary`. Mark a
+repo-local style *(custom)*, and when a custom `id` shadows a built-in, mark the
+built-in *(shadowed)*. Then ask; don't pick for the user.
+
+**Read the chosen style file before planning** — its ordering principles, test
+placement, and coherence promise drive §3b.
+
+## 3b. Plan the story
+
+Partition the diff into ordered steps. Each step is one commit. The **ordering
+principles** and the **coherence promise** come from the chosen style file (§3a).
+These rules are style-independent and always apply:
+
+- **One idea per commit.** A reviewer should be able to say what the commit does
+  in one short sentence. If your draft message contains "and", split it.
+- **Files may evolve across steps.** A file appearing in several commits with
+  partial content is the point — e.g. a module gains its types in step 1, its
+  core function in step 3, an edge case in step 5.
+- **Don't over-split.** A mechanical rename, a lockfile, or a formatting sweep
+  is one commit no matter how many files it touches. Typical output is 5–15
+  commits; a small PR may honestly be 3.
 
 Commit message style — terse but load-bearing:
 
@@ -68,7 +103,9 @@ Commit message style — terse but load-bearing:
   shape", not "Added the RetryPolicy interface".
 - Body (optional, 1–2 sentences): the *why* or the decision taken, never a
   restatement of the diff. No Co-Authored-By or generated-with footers —
-  these commits narrate the original author's work.
+  these commits narrate the original author's work. (The one exception is the
+  `Narrative-Style:` trailer on the first commit, §4 — load-bearing metadata,
+  not noise.)
 
 Show the user the planned commit list (subjects only) before materializing if
 the plan is surprising in any way (reordering that changes meaning, dropped
@@ -90,6 +127,18 @@ then:
 ```
 git add -A && git commit --no-verify -m "<subject>" [-m "<body>"]
 ```
+
+Stamp the style on the branch: the first commit *of the story* — the first
+feature commit, skipping any chore/housekeeping the ordering put ahead of it —
+ends its body with a git-style trailer naming the resolved style, on its own
+line after a blank line:
+
+```
+git commit --no-verify -m "<subject>" [-m "<body>"] -m "Narrative-Style: <style-id>"
+```
+
+The viewer finds the trailer on whichever commit carries it and shows which
+style told the replay; it survives push.
 
 Rules while editing intermediate states:
 
