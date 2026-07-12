@@ -299,6 +299,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   flex: 1;
   height: 14px;
   cursor: pointer;
+  touch-action: none;        /* drag seeks the bar; don't scroll/zoom the page */
+  user-select: none;
 }
 
 .seg {
@@ -478,7 +480,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   background: rgba(255, 255, 255, 0.06);
 }
 .mobile #btn-next { background: rgba(226, 163, 61, 0.16); color: var(--accent); }
-.mobile #scrubber { height: 22px; min-width: 0; }   /* shrink, don't shove the next button off-screen */
+/* content-box: keep the 22px filmstrip look but pad the touch area to ~44px */
+.mobile #scrubber { box-sizing: content-box; height: 22px; padding: 11px 0; min-width: 0; }
 .mobile .seg { min-width: 6px; }
 
 .mobile #status .hint { display: none; }       /* keyboard hints are meaningless on touch */

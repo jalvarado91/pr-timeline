@@ -413,25 +413,69 @@ function renderChrome() {
 function renderScrubber() {
   const el = $('scrubber');
   el.innerHTML = '';
-  state.timeline.commits.forEach((commit, c) => {
+  let fi = 0;                              // flat frame index, matches state.frames order
+  state.timeline.commits.forEach((commit) => {
     const seg = document.createElement('div');
     seg.className = 'seg';
     const churn = commit.files.reduce(
       (sum, f) => sum + (f.additions ?? 0) + (f.deletions ?? 0), 0);
     seg.style.flexGrow = String(Math.sqrt(Math.max(churn, 1)));
-    commit.files.forEach((file, f) => {
+    commit.files.forEach((file) => {
       const tick = document.createElement('div');
       tick.className = 'tick';
       tick.title = `${commit.subject}\n${file.path}`;
-      tick.addEventListener('click', () => {
-        loadFrame(state.frames.findIndex((fr) => fr.c === c && fr.f === f), 0);
-      });
+      tick.dataset.frame = String(fi++);
       seg.appendChild(tick);
     });
     if (!commit.files.length) seg.appendChild(document.createElement('div')).className = 'tick';
     el.appendChild(seg);
   });
+  bindScrubberDrag();
   updateScrubber();
+}
+
+/* Press-and-drag anywhere on the bar to seek live to the change under the
+   pointer. Works for touch and mouse; a tap is just a zero-length drag. */
+let scrubbing = false;
+let scrubCenters = [];      // [{frame, x}] cached at drag start; layout is stable mid-drag
+let scrubLastFrame = -1;
+
+function bindScrubberDrag() {
+  const el = $('scrubber');
+  if (el.dataset.dragBound) return;       // bind once; renderScrubber only clears children
+  el.dataset.dragBound = '1';
+
+  const seek = (clientX) => {
+    let best = -1, bestDist = Infinity;
+    for (const c of scrubCenters) {
+      const d = Math.abs(c.x - clientX);
+      if (d < bestDist) { bestDist = d; best = c.frame; }
+    }
+    if (best < 0 || best === scrubLastFrame) return;
+    scrubLastFrame = best;
+    loadFrame(best, 0);
+  };
+
+  el.addEventListener('pointerdown', (e) => {
+    scrubCenters = [...el.querySelectorAll('.tick[data-frame]')].map((t) => {
+      const r = t.getBoundingClientRect();
+      return { frame: Number(t.dataset.frame), x: r.left + r.width / 2 };
+    });
+    if (!scrubCenters.length) return;
+    scrubbing = true;
+    scrubLastFrame = -1;
+    el.setPointerCapture(e.pointerId);
+    seek(e.clientX);
+    e.preventDefault();
+  });
+  el.addEventListener('pointermove', (e) => { if (scrubbing) seek(e.clientX); });
+  const end = (e) => {
+    if (!scrubbing) return;
+    scrubbing = false;
+    try { el.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
 }
 
 function updateScrubber() {
