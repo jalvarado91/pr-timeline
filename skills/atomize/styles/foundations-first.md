@@ -21,8 +21,7 @@ lands. The story climbs from definitions to the call sites that use them.
 
 ## Test placement
 
-Tests and docs come last, after the code they exercise. If the story should be
-test-led, that's a different style — use `tdd`.
+Tests and docs come last, after the code they exercise.
 
 ## Coherence promise
 

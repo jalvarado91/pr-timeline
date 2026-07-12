@@ -1,6 +1,6 @@
 ---
 name: atomize
-description: Break a PR, large commit, or ref range into atomic commits on a replay/<name> branch — ordered as the code would plausibly have been written, in a chosen narrative style (foundations-first by default, or TDD/wishful-API/etc.), with terse commit messages. Use when the user wants to atomize, decompose, split, or "make replayable" a large diff, optionally "in a TDD way" or another style.
+description: Break a PR, large commit, or ref range into atomic commits on a replay/<name> branch — ordered as the code would plausibly have been written, in a chosen narrative style (foundations-first by default, or wishful-API/mvp-refine/etc.), with terse commit messages. Use when the user wants to atomize, decompose, split, or "make replayable" a large diff, optionally in a named narrative style.
 ---
 
 # Atomize a diff into replayable commits
@@ -48,8 +48,8 @@ states, so you need the destination in full, not just hunks.
 A *narrative style* decides ordering and the coherence promise — the shape of
 the story. Resolve one before planning:
 
-1. **Explicit** — a style named in `$ARGUMENTS` (`... tdd`, `... style=wishful`)
-   or in prose ("atomize this TDD-style").
+1. **Explicit** — a style named in `$ARGUMENTS` (`... wishful-api`, `... style=mvp-refine`)
+   or in prose ("atomize this top-down").
 2. **Repo-local** — `.pr-timeline/styles/*.md` in the *target* repo (the one
    being atomized, not this plugin), each with the same frontmatter + sections
    as a built-in. A repo-local style shadows a built-in of the same `id`.

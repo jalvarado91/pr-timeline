@@ -30,8 +30,7 @@ is imagined anymore.
 
 ## Test placement
 
-Tests come last, once every imagined symbol is real. If the story should be
-test-led, that's a different style — use `tdd`.
+Tests come last, once every imagined symbol is real.
 
 ## Docs and ride-alongs
 

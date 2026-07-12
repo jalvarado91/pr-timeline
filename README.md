@@ -24,11 +24,10 @@ story is told and its coherence rules. Four are built in:
 |----|---------|
 | `foundations-first` | Bottom-up: definitions before use, tests last. The default. |
 | `wishful-api` | Top-down: entry point first against APIs you wish existed, then descend and make each real. |
-| `tdd` | Red-green-refactor: a failing test leads each behavior slice, then the minimal code to pass it. |
 | `mvp-refine` | A crude end-to-end slice first (hardcoding named as such), then edge cases, errors, cleanup. |
 
-Pick one by naming it in the invocation — `/pr-timeline:atomize 42 tdd` — or in
-prose ("atomize this TDD-style"). No style named → `foundations-first`. Not sure?
+Pick one by naming it in the invocation — `/pr-timeline:atomize 42 wishful-api` — or in
+prose ("atomize this top-down"). No style named → `foundations-first`. Not sure?
 Ask "what styles are there?" and atomize lists them.
 
 ### Add your own
