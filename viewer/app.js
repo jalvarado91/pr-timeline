@@ -45,7 +45,17 @@ require(['vs/editor/editor.main'], () => {
   });
 });
 
+// Hold an SSE connection so the server knows a viewer is open; it self-exits a
+// while after the last tab closes. EventSource auto-reconnects if it drops (a
+// server takeover, laptop sleep), so no error handling is needed. Keep the
+// reference so it isn't garbage-collected and closed.
+let liveness = null;
+function keepServerAlive() {
+  try { liveness = new EventSource('/api/events'); } catch { /* server falls back to its timers */ }
+}
+
 async function init() {
+  keepServerAlive();
   const res = await fetch('/api/timeline');
   if (!res.ok) throw new Error(`timeline failed: ${res.status}`);
   state.timeline = await res.json();
