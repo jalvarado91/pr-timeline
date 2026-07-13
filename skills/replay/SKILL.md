@@ -28,18 +28,23 @@ prefix); empty means the newest `replay/*` branch.
    Use the newest; if there are none, tell the user to run
    `/pr-timeline:atomize` first.
 
-3. **Start the server in the background** (use run_in_background):
+3. **Start the server** with `--daemon` — a normal foreground command that
+   detaches, prints the URL, and returns in about a second (do **not** use
+   run_in_background):
 
    ```
    node "${CLAUDE_PLUGIN_ROOT}/bin/pr-timeline.mjs" serve \
-     --repo <repo path> --branch <branch> [--base <sha>] --port 4820 --open
+     --repo <repo path> --branch <branch> [--base <sha>] --port 4820 --daemon --open
    ```
 
    Pass `--base` when you know the exact base commit (e.g. atomize just
    reported it); otherwise the server auto-detects via merge-base with the
-   default branch. If the port is busy, retry with 4821, 4822, …
+   default branch. A previous pr-timeline on port 4820 is taken over
+   automatically; only if the command reports the port is held by *another*
+   program should you retry with `--port 4821`, `4822`, …
 
-4. **Report** the URL (`http://127.0.0.1:<port>`) and the essentials: `←`/`→`
-   step through every change, `⇧←`/`⇧→` jump commits, `t` toggles the rail,
-   `?` shows all keys. The server stays up until the session ends or the task
-   is stopped.
+4. **Report** the URL the command printed (`http://127.0.0.1:<port>`) and the
+   essentials: `←`/`→` step through every change, `⇧←`/`⇧→` jump commits, `t`
+   toggles the rail, `?` shows all keys. The server retires itself about 15
+   minutes after the last viewer tab closes (and after 12h regardless), so
+   there's nothing to clean up.

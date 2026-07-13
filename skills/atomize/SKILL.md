@@ -28,19 +28,26 @@ Both must be real commits in the local repo.
   where default comes from `git symbolic-ref refs/remotes/origin/HEAD`
   (fallback `main`, then `master`).
 
-Record both full SHAs. Pick a short kebab-case `<name>` from the PR title or
-commit subject. If `replay/<name>` already exists, ask before overwriting
-(`git branch -D`) or pick a suffix.
+Record both full SHAs and refer to them by those literal SHAs from here on —
+call them `$BASE_SHA` and `$SRC_SHA` (the source head). **Never use the bare
+token `HEAD` in the commands below.** Inside the replay worktree (§4) `HEAD` is
+the replay branch, not the source, so `HEAD` would silently checkout or diff
+against the wrong tree — and the §5 exactness check would pass vacuously. Every
+command that means "the source" must name `$SRC_SHA` explicitly.
+
+Pick a short kebab-case `<name>` from the PR title or commit subject. If
+`replay/<name>` already exists, ask before overwriting (`git branch -D`) or pick
+a suffix.
 
 ## 2. Study the diff
 
 ```
-git diff --stat BASE HEAD
-git diff BASE HEAD
+git diff --stat $BASE_SHA $SRC_SHA
+git diff $BASE_SHA $SRC_SHA
 ```
 
 For anything non-trivial also read the final versions of the key changed files
-(`git show HEAD:<path>`) — you are about to reconstruct their intermediate
+(`git show $SRC_SHA:<path>`) — you are about to reconstruct their intermediate
 states, so you need the destination in full, not just hunks.
 
 ## 3a. Pick the style
@@ -113,11 +120,14 @@ whitespace-only noise, etc.). Otherwise proceed.
 
 ## 4. Materialize in a throwaway worktree
 
-Never build on the user's working tree. Use the scratchpad directory:
+Never build on the user's working tree. Build in a fresh temp directory
+(`BUILD=$(mktemp -d)`), and run every git command in this section **from inside
+that worktree** (`cd "$BUILD/replay-build"`):
 
 ```
-git worktree add <scratchpad>/replay-build BASE
-cd <scratchpad>/replay-build
+BUILD=$(mktemp -d)
+git worktree add "$BUILD/replay-build" $BASE_SHA
+cd "$BUILD/replay-build"
 git switch -c replay/<name>
 ```
 
@@ -143,29 +153,32 @@ style told the replay; it survives push.
 Rules while editing intermediate states:
 
 - Copy final content **exactly** for every region that has reached its final
-  form — reconstruct from `git show HEAD:<path>`, don't retype from memory.
+  form — reconstruct from `git show $SRC_SHA:<path>`, don't retype from memory.
 - Renames: `git mv` in the step that renames; binary files:
-  `git checkout HEAD -- <path>` in the step where they belong.
+  `git checkout $SRC_SHA -- <path>` in the step where they belong.
 - Deletions of replaced code get their own step near the end ("retire X") when
   meaningful, or ride along with the commit that replaces them.
 
 ## 5. Verify exactness, then hand off
 
-After the last step:
+After the last step, still inside the worktree, diff the replay branch against
+the **source SHA** (not `HEAD` — that is the replay branch itself, so it would
+always be empty):
 
 ```
-git diff --stat replay/<name> HEAD
+git diff --stat replay/<name> $SRC_SHA
 ```
 
-This **must be empty**. If it isn't, sync the remainder — `git checkout HEAD -- .`
+This **must be empty**. If it isn't, sync the remainder — `git checkout $SRC_SHA -- .`
 — and either amend it into the final commit (if it belongs there) or add one
-more terse commit. Re-run the check. Never leave the branch differing from HEAD.
+more terse commit. Re-run the check. Never leave the branch differing from
+`$SRC_SHA`.
 
 Cleanup and report:
 
 ```
-cd <original repo> && git worktree remove <scratchpad>/replay-build
-git log --oneline BASE..replay/<name>
+cd <original repo> && git worktree remove "$BUILD/replay-build"
+git log --oneline $BASE_SHA..replay/<name>
 ```
 
 Tell the user the branch name and the commit list, and offer to launch the

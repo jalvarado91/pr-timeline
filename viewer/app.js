@@ -45,7 +45,17 @@ require(['vs/editor/editor.main'], () => {
   });
 });
 
+// Hold an SSE connection so the server knows a viewer is open; it self-exits a
+// while after the last tab closes. EventSource auto-reconnects if it drops (a
+// server takeover, laptop sleep), so no error handling is needed. Keep the
+// reference so it isn't garbage-collected and closed.
+let liveness = null;
+function keepServerAlive() {
+  try { liveness = new EventSource('/api/events'); } catch { /* server falls back to its timers */ }
+}
+
 async function init() {
+  keepServerAlive();
   const res = await fetch('/api/timeline');
   if (!res.ok) throw new Error(`timeline failed: ${res.status}`);
   state.timeline = await res.json();
@@ -253,7 +263,17 @@ async function loadFrame(idx, at) {
   renderChrome();
   $('change-label').textContent = '…';
 
-  const payload = await fetchFile(fr);
+  let payload;
+  try {
+    payload = await fetchFile(fr);
+  } catch (err) {
+    if (token !== state.navToken) return;
+    showPlaceholder(`couldn't load ${fr.file.path}: ${err.message ?? err}`);
+    state.changes = [];
+    state.changeIdx = 0;
+    finishFrame();
+    return;
+  }
   if (token !== state.navToken) return;
 
   disposeModels();
@@ -320,12 +340,12 @@ function waitForDiff(token) {
       sub.dispose();
       resolve(diffEditor.getLineChanges());
     });
-    setTimeout(() => {                 // safety net: never strand navigation
+    setTimeout(() => {                 // safety net: never strand navigation (big diffs are slow)
       if (token === state.navToken) {
         sub.dispose();
         resolve(diffEditor.getLineChanges() ?? []);
       }
-    }, 3000);
+    }, 8000);
   });
 }
 
