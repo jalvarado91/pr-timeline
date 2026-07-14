@@ -45,13 +45,62 @@ require(['vs/editor/editor.main'], () => {
   });
 });
 
-// Hold an SSE connection so the server knows a viewer is open; it self-exits a
-// while after the last tab closes. EventSource auto-reconnects if it drops (a
-// server takeover, laptop sleep), so no error handling is needed. Keep the
-// reference so it isn't garbage-collected and closed.
+// Hold an SSE connection so the server knows a viewer is open; while any tab
+// holds it the server stays up, and it self-retires a while after the last tab
+// drops. Browsers silently drop this heartbeat when a tab is backgrounded, the
+// device sleeps, or the network blips — and don't always reopen it — so we
+// re-establish it whenever we regain focus/network, and surface a clear banner
+// when the backend is truly gone (a retired daemon can't be revived from here).
 let liveness = null;
+
+function openLiveness() {
+  try {
+    liveness?.close();                        // never leave a prior instance retrying in the background
+    liveness = new EventSource('/api/events');
+    liveness.onopen = () => showDisconnected(false);
+    liveness.onerror = () => {
+      // EventSource retries on its own; only raise the alarm if, a few seconds
+      // on, it still hasn't reconnected — then confirm with a direct probe.
+      setTimeout(() => { if (!liveness || liveness.readyState !== 1) verifyConnection(); }, 4000);
+    };
+  } catch { /* no EventSource; fall back to the server's own timers */ }
+}
+
+// Probe the backend directly. Alive → clear the banner and make sure the
+// heartbeat is open again. Gone → show the banner. Returns whether it answered.
+async function verifyConnection() {
+  try {
+    const res = await fetch('/api/status', { cache: 'no-store' });
+    if (!res.ok) throw new Error(String(res.status));
+    const st = await res.json();
+    if (st.app !== 'pr-timeline') throw new Error('not pr-timeline');   // a stranger took the port
+    showDisconnected(false);
+    if (!liveness || liveness.readyState === 2) openLiveness();   // 2 = CLOSED
+    return true;
+  } catch {
+    showDisconnected(true);
+    return false;
+  }
+}
+
+function showDisconnected(down) {
+  $('conn-banner').hidden = !down;
+}
+
 function keepServerAlive() {
-  try { liveness = new EventSource('/api/events'); } catch { /* server falls back to its timers */ }
+  openLiveness();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) verifyConnection(); });
+  window.addEventListener('online', verifyConnection);
+  // A foreground tab must keep the server alive even while the reader just sits
+  // and reads: the SSE can go half-open (a network/NAT blip kills the server's
+  // side while the browser still reports it open), and :ping is an invisible SSE
+  // comment, so passive watchdogging is impossible. Actively probe instead —
+  // each probe bumps the server's lastActivity, so the idle reaper can't fire
+  // while a tab is visible, and a dead backend is caught within the interval.
+  setInterval(() => { if (!document.hidden) verifyConnection(); }, 5 * 60_000);
+  $('conn-retry').addEventListener('click', async () => {
+    if (await verifyConnection()) loadFrame(state.frameIdx, state.changeIdx);   // refetch what may have failed
+  });
 }
 
 async function init() {
@@ -268,6 +317,7 @@ async function loadFrame(idx, at) {
     payload = await fetchFile(fr);
   } catch (err) {
     if (token !== state.navToken) return;
+    verifyConnection();                       // a failed fetch usually means the server retired
     showPlaceholder(`couldn't load ${fr.file.path}: ${err.message ?? err}`);
     state.changes = [];
     state.changeIdx = 0;
