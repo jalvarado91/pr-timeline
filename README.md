@@ -1,19 +1,23 @@
 # pr-timeline
 
-Take a PR (or any large diff) and re-tell it as a sequence of atomic commits —
-ordered the way the code would plausibly have been written — then step through
-those commits in an editor-grade viewer, change by change, in place in the
-files.
+Step through a code change one edit at a time in an editor-grade viewer, in
+place in the files: a PR, a branch, a single commit, a ref range, the variant
+branch in the worktree next door.
 
-Two halves:
+And when a change landed as one undifferentiated lump, re-tell it first as a
+sequence of atomic commits ordered the way the code would plausibly have been
+written, then step through that.
 
-- **`/pr-timeline:atomize`** — a Claude Code skill that studies a PR, commit,
-  or ref range, plans a "how this was written" narrative, and materializes it
-  as real commits on a `replay/<name>` branch (built in a throwaway worktree,
-  verified byte-identical to the source head).
-- **`/pr-timeline:replay`** — serves the viewer for that branch. A tiny
-  zero-dependency Node server reads everything live from git and renders it
-  with Monaco.
+Two Claude Code skills:
+
+- **`/pr-timeline:view`** — serves the viewer for any `base..head` range. Point
+  it at a PR number, a branch, a SHA, `a..b`, or nothing at all (the current
+  branch against its merge-base). A zero-dependency Node server reads everything
+  live from git and renders it with Monaco. Writes nothing.
+- **`/pr-timeline:atomize`** — studies a PR, commit, or ref range, plans a "how
+  this was written" narrative, and materializes it as real commits on a
+  `replay/<name>` branch, built in a throwaway worktree and verified
+  byte-identical to the source head. Then hands off to `view`.
 
 ## Narrative styles
 
@@ -86,6 +90,10 @@ second commit subject
 - A sidebar with the commit list and the current commit's files (`t`, or the
   `sidebar` button) — it docks beside the editor, pushing it over.
 - `x` (or `fold`) folds unchanged regions when you want just the deltas.
+- Merge commits are skipped: a merge has no single-parent diff, so it would be
+  a step you can't enter. A branch that merged `main` mid-flight shows the
+  commits authored on it. Uncommitted work isn't shown at all — every step
+  comes from a commit.
 - Mac-flavored chrome: a slim menu bar and status bar; the commit card floats
   in glass with traffic-dot controls (minimize to a chip, cycle corners —
   also `m` / `c`); the scrubber rides in a floating timeline pill with the
@@ -105,7 +113,7 @@ As a Claude Code plugin:
 
 **Requirements:** `node ≥ 18` and `git` on your `PATH`. The viewer's only
 dependency (monaco-editor) is installed automatically the first time
-`/pr-timeline:replay` runs, or manually with `npm install`.
+`/pr-timeline:view` runs, or manually with `npm install`.
 
 ### Updating
 
@@ -123,8 +131,8 @@ pr-timeline` and `claude plugin update pr-timeline@pr-timeline`.)
 
 ## Standalone use
 
-The viewer works on any branch whose commits you want to walk, not just
-generated ones:
+The skills are a convenience; the server takes plain git revs, so any
+`base..head` you can name works from the CLI directly:
 
 ```
 node bin/pr-timeline.mjs serve --repo <path> --branch <name> [--base <ref>] [--port 4820] [--host <addr>] [--open]
@@ -145,6 +153,6 @@ merge-base with the default branch.
 ```
 bin/pr-timeline.mjs    server + CLI (node ≥ 18, zero runtime deps)
 viewer/                vanilla JS + Monaco frontend
+skills/view/           the show-me-this-diff skill
 skills/atomize/        the diff → atomic commits skill
-skills/replay/         the launch-the-viewer skill
 ```
