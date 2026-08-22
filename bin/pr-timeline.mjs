@@ -100,8 +100,13 @@ function fail(msg) {
 }
 
 function loadTimeline(repo, base, branch) {
+  // --no-merges: a merge has no single-parent diff, so diff-tree reports zero
+  // files for it and the viewer would show a step you can't enter. Atomized
+  // branches never contain merges, but a real PR branch that merged the default
+  // branch mid-flight does. Dropping them leaves the commits actually authored
+  // on the branch, which is what there is to step through.
   const log = gitText(repo, [
-    'log', '--reverse', '--format=%H%x1f%s%x1f%b%x1e', `${base}..${branch}`,
+    'log', '--reverse', '--no-merges', '--format=%H%x1f%s%x1f%b%x1e', `${base}..${branch}`,
   ]);
   const commits = log.split('\x1e').map(s => s.replace(/^\n/, '')).filter(s => s.trim()).map(rec => {
     const [sha, subject, body] = rec.split('\x1f');
