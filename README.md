@@ -135,7 +135,7 @@ The skills are a convenience; the server takes plain git revs, so any
 `base..head` you can name works from the CLI directly:
 
 ```
-node bin/pr-timeline.mjs serve --repo <path> --branch <name> [--base <ref>] [--port 4820] [--host <addr>] [--open]
+node bin/pr-timeline.mjs serve --repo <path> --branch <rev> [--base <rev>] [--port 4820] [--host <addr>] [--open]
 ```
 
 `--branch` defaults to the newest `replay/*` branch; `--base` defaults to the

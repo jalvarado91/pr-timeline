@@ -114,7 +114,7 @@ async function init() {
       state.frames.push({ c, f, commit, file });
     });
   });
-  if (!state.frames.length) throw new Error('no commits to replay on this branch');
+  if (!state.frames.length) throw new Error('no commits to step through in this range');
 
   setupMonaco();
   renderScrubber();
