@@ -32,13 +32,15 @@ for `HEAD` when one exists: the viewer displays it.
 - **PR number or URL** — read the ends, then fetch both (works for forks):
 
   ```
-  gh pr view <n> --json headRefName,baseRefName,title
-  git fetch origin "pull/<n>/head:refs/pr-timeline/<n>" "<baseRefName>"
+  gh pr view <n> --json baseRefOid,title
+  git fetch origin "+pull/<n>/head:refs/pr-timeline/<n>" <baseRefOid>
   ```
 
-  HEAD = `refs/pr-timeline/<n>`, BASE = `git merge-base origin/<baseRefName> refs/pr-timeline/<n>`.
-  The fetch writes a namespaced ref, not a branch, so it stays out of
-  `git branch` and re-fetching is safe.
+  HEAD = `refs/pr-timeline/<n>`, BASE = `git merge-base <baseRefOid> refs/pr-timeline/<n>`.
+  `baseRefOid` is the base branch as the PR saw it, so a merged PR still has its
+  commits; against today's base branch they are already ancestors and the range
+  comes up empty. The fetch writes a namespaced ref, not a branch, so it stays
+  out of `git branch`; the `+` lets a re-fetch follow a force-pushed PR.
 - **A range `a..b`** — BASE = `a`, HEAD = `b`, as written.
 - **A single SHA** — HEAD = the SHA, BASE = `<sha>^`. For a root commit, BASE =
   `git hash-object -t tree /dev/null` (the empty tree).
