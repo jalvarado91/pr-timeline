@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// pr-timeline: serve an editor-grade replay viewer for an atomized commit branch.
+// pr-timeline: serve an editor-grade viewer that steps through a range of commits.
 // Zero runtime deps — reads everything live from git, serves Monaco from node_modules.
 
 import http from 'node:http';
@@ -18,10 +18,10 @@ function usage(code = 0) {
 
 options:
   --repo <path>     git repository to read (default: cwd)
-  --branch <name>   replay branch to show (default: current branch if replay/*,
+  --branch <rev>    last commit to show (default: current branch if replay/*,
                     else most recently committed replay/* branch)
-  --base <ref>      commit the replay starts from (default: merge-base with the
-                    default branch)
+  --base <rev>      commit to start after (default: merge-base with the default
+                    branch)
   --port <n>        port to listen on (default: 4820)
   --host <addr>     interface to bind (default: 127.0.0.1; use 0.0.0.0 to
                     expose on your LAN)
@@ -100,8 +100,10 @@ function fail(msg) {
 }
 
 function loadTimeline(repo, base, branch) {
+  // --no-merges: a merge has no single-parent diff, so it would be an empty
+  // step you can't enter.
   const log = gitText(repo, [
-    'log', '--reverse', '--format=%H%x1f%s%x1f%b%x1e', `${base}..${branch}`,
+    'log', '--reverse', '--no-merges', '--format=%H%x1f%s%x1f%b%x1e', `${base}..${branch}`,
   ]);
   const commits = log.split('\x1e').map(s => s.replace(/^\n/, '')).filter(s => s.trim()).map(rec => {
     const [sha, subject, body] = rec.split('\x1f');
@@ -282,7 +284,7 @@ async function daemonize(args, branch, base) {
     catch { fail(`server failed to start (see ${logPath}) — is port ${args.port} held by another program? try --port <n>`); }
     const st = await probeStatus(probeHost, args.port).catch(() => null);
     if (st && st.pid === child.pid) {
-      console.log(`pr-timeline: replaying ${branch} (${base.slice(0, 7)}..) from ${args.repo}`);
+      console.log(`pr-timeline: showing ${branch} (${base.slice(0, 7)}..) from ${args.repo}`);
       console.log(`  ${url}`);
       if (args.open) openBrowser(url);
       process.exit(0);
@@ -392,7 +394,7 @@ function startServer(args, branch, base) {
 
   server.listen(args.port, args.host, () => {
     const addr = `http://${displayHost(args.host)}:${args.port}`;
-    console.log(`pr-timeline: replaying ${branch} (${base.slice(0, 7)}..) from ${args.repo}`);
+    console.log(`pr-timeline: showing ${branch} (${base.slice(0, 7)}..) from ${args.repo}`);
     console.log(`  ${addr}`);
     if (args.open) openBrowser(addr);
   });

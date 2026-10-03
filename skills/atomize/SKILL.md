@@ -9,8 +9,12 @@ Take one large diff and re-tell it as a sequence of small commits that reads lik
 the code being written. How the story is ordered is set by a *narrative style*
 (§3a) — by default `foundations-first`: definitions first, then logic, then
 integration, then tests. The result is a real branch named `replay/<name>` whose
-final tree is **byte-identical** to the source head. The user replays it with
-`/pr-timeline:replay`.
+final tree is **byte-identical** to the source head. The user steps through it with
+`/pr-timeline:view`.
+
+This skill **writes a branch**. Only run it when the user wants the diff re-told
+as a story. To just look at an existing diff, PR, or branch as it stands, use
+`/pr-timeline:view` instead.
 
 Argument: `$ARGUMENTS` may be a PR number/URL, a commit SHA, a ref range
 (`base..head`), or empty (use the current branch against the default branch).
@@ -182,4 +186,4 @@ git log --oneline $BASE_SHA..replay/<name>
 ```
 
 Tell the user the branch name and the commit list, and offer to launch the
-viewer with `/pr-timeline:replay`.
+viewer with `/pr-timeline:view`.

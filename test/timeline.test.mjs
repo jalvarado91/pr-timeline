@@ -61,3 +61,25 @@ test('extractStyle lifts the trailer and strips it from the body', () => {
 
   assert.equal(extractStyle([{ body: 'no trailer here' }]), null);
 });
+
+// A branch that merged main mid-flight: the merge itself has no single-parent
+// diff, so it must not become an empty, unenterable step.
+test('loadTimeline skips merge commits', () => {
+  const { repo, base } = fixture();
+  git(repo, 'switch', '-q', '-c', 'feature');
+  writeFileSync(path.join(repo, 'feat.txt'), 'feature work\n');
+  git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'add feature');
+
+  git(repo, 'switch', '-q', 'main');
+  writeFileSync(path.join(repo, 'other.txt'), 'unrelated\n');
+  git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'unrelated main work');
+
+  git(repo, 'switch', '-q', 'feature');
+  git(repo, 'merge', '-q', '--no-ff', '-m', 'Merge main into feature', 'main');
+  const mergeBase = git(repo, 'merge-base', 'main', 'feature').trim();
+
+  const { commits } = loadTimeline(repo, mergeBase, 'feature');
+  assert.ok(!commits.some((c) => c.subject.startsWith('Merge ')), 'no merge commits');
+  assert.ok(commits.every((c) => c.files.length > 0), 'every step has files to show');
+  assert.ok(commits.some((c) => c.subject === 'add feature'), 'branch work is kept');
+});
