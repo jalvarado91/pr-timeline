@@ -105,7 +105,8 @@ viewer tab closes (and after 12h regardless), so there is nothing to clean up.
 
 - **Merge commits are skipped.** A merge has no single-parent diff, so it would
   be a step you can't enter. A branch that merged the default branch mid-flight
-  shows the commits authored on it, not what the merge dragged in.
+  shows the commits authored on it, not what the merge dragged in. Given a
+  merge commit's own SHA, `<sha>^..<sha>` steps through the commits it merged.
 - **A root commit can't be shown.** Each step diffs a commit against its
   parent, and a root commit has none.
 - **Uncommitted work isn't shown** — every step comes from a commit. If the
