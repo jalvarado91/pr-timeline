@@ -42,8 +42,8 @@ for `HEAD` when one exists: the viewer displays it.
   comes up empty. The fetch writes a namespaced ref, not a branch, so it stays
   out of `git branch`; the `+` lets a re-fetch follow a force-pushed PR.
 - **A range `a..b`** — BASE = `a`, HEAD = `b`, as written.
-- **A single SHA** — HEAD = the SHA, BASE = `<sha>^`. For a root commit, BASE =
-  `git hash-object -t tree /dev/null` (the empty tree).
+- **A single SHA** — HEAD = the SHA, BASE = `<sha>^`. A root commit has no
+  parent and can't be shown (see below).
 - **Two things to compare** ("this variant against that one") — HEAD = the second,
   BASE = `git merge-base <first> <second>`. Using the first directly as BASE
   shows only what the second added, which is rarely what was meant.
@@ -94,6 +94,8 @@ viewer tab closes (and after 12h regardless), so there is nothing to clean up.
 - **Merge commits are skipped.** A merge has no single-parent diff, so it would
   be a step you can't enter. A branch that merged the default branch mid-flight
   shows the commits authored on it, not what the merge dragged in.
+- **A root commit can't be shown.** Each step diffs a commit against its
+  parent, and a root commit has none.
 - **Uncommitted work isn't shown** — every step comes from a commit. If the
   interesting change is still in the working tree, commit or stash it first.
 - **One squashed commit is one step.** When the target is a single large commit
