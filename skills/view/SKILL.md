@@ -54,8 +54,15 @@ Verify both resolve before launching:
 git -C <REPO> rev-parse --verify --quiet "<ref>^{commit}"
 ```
 
-If HEAD has no commits over BASE, there is nothing to step through — report that
-instead of starting a server.
+Then count what the viewer will step through. It skips merges, so count the same
+way:
+
+```
+git -C <REPO> rev-list --count --no-merges <BASE>..<HEAD>
+```
+
+If that is 0, there is nothing to step through — report that instead of
+starting a server. A branch already merged into the default branch lands here.
 
 ## 2. Ensure the viewer's dependency is installed
 
