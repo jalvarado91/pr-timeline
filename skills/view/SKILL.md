@@ -66,7 +66,8 @@ git -C <REPO> rev-list --count --no-merges <BASE>..<HEAD>
 ```
 
 If that is 0, there is nothing to step through — report that instead of
-starting a server. A branch already merged into the default branch lands here.
+starting a server. A branch already merged into the default branch lands here;
+if it was merged through a PR, offer to view the PR instead, which still works.
 
 ## 2. Ensure the viewer's dependency is installed
 
