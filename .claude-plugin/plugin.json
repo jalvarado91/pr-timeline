@@ -1,5 +1,5 @@
 {
   "name": "pr-timeline",
-  "description": "Atomize a PR or large commit into replayable atomic commits, then step through them in an editor-grade viewer",
+  "description": "Step through any PR, branch, commit, or ref range change by change in an editor-grade viewer, or atomize a large diff into atomic commits first",
   "author": { "name": "Juan Alvarado" }
 }
