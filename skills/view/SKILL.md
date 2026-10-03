@@ -18,7 +18,9 @@ Argument: `$ARGUMENTS` names what to show, or is empty for the current branch.
 ## 1. Resolve REPO, BASE, HEAD
 
 `REPO` is the current repo unless the user named a worktree or another checkout,
-in which case it is that path — pass it as `--repo`.
+in which case it is that path — pass it as `--repo`. A path on its own means
+what is checked out there: resolve it as **Nothing** below, running each command
+with `git -C <REPO>`. If that worktree is on a detached HEAD, HEAD = its SHA.
 
 Resolve `HEAD` and `BASE` by what you were given. Prefer a *ref name* over a SHA
 for `HEAD` when one exists: the viewer displays it.
@@ -28,7 +30,9 @@ for `HEAD` when one exists: the viewer displays it.
   (fallback `main`, then `master`). If HEAD *is* the default branch, say so and
   ask what to show rather than replaying the whole history.
 - **A branch name** — HEAD = that branch, BASE = its merge-base with the default
-  branch. A `replay/<name>` branch is this case; so is a variant branch.
+  branch. A `replay/<name>` branch is this case; so is a variant branch. If only
+  `origin/<name>` exists (someone else's branch you haven't checked out), use
+  that; `<name>` alone won't resolve.
 - **PR number or URL** — read the ends, then fetch both (works for forks):
 
   ```
