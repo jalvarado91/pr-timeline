@@ -211,8 +211,13 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   background: var(--bg-editor);
 }
 /* keep the floating card over the code, not over the views */
-.reps-open:not(.mobile) #topcard.tc-tr,
-.reps-open:not(.mobile) #topcard.tc-br { right: calc(min(40%, 640px) + 12px); }
+.reps-open:not(.mobile):not(.reps-full) #topcard.tc-tr,
+.reps-open:not(.mobile):not(.reps-full) #topcard.tc-br { right: calc(min(40%, 640px) + 12px); }
+
+/* a view step, or swapped: the view takes the code's place, full size */
+.reps-full #editor-wrap { display: none; }
+.reps-full #reps { flex: 1; width: auto; max-width: none; border-left: 0; }
+.reps-full:not(.mobile) #reps-body { font-size: 13px; padding-left: max(0px, calc(50% - 380px)); }
 
 #reps-bar {
   display: flex;
@@ -221,7 +226,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   padding: 6px 8px;
   border-bottom: 1px solid var(--glass-edge);
 }
-#reps-tabs { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; min-width: 0; }   /* every changed dot stays in sight */
+#reps-tabs { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }   /* every changed dot stays in sight */
 .rep-tab {
   font-family: var(--mono);
   font-size: 11px;
@@ -232,7 +237,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 }
 .rep-tab:hover { color: var(--text); }
 .rep-tab[aria-selected="true"] { color: var(--text); background: rgba(255, 255, 255, 0.13); }
-.rep-tab.changed::after {          /* this step says something new in that view */
+.rep-tab.changed::after,
+#tb-reps.changed::after {          /* this step says something new in that view */
   content: '';
   display: inline-block;
   width: 6px; height: 6px;
@@ -241,8 +247,11 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   border-radius: 50%;
   background: var(--accent);
 }
+#tb-reps { position: relative; }
+#tb-reps.changed::after { position: absolute; top: 2px; right: 2px; margin: 0; }   /* the step changed a view you aren't seeing */
 
 #reps-body {
+  min-height: 0;
   flex: 1;
   overflow: auto;
   padding: 12px 0 72px;            /* clear the floating timeline pill */
@@ -387,6 +396,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 }
 .tick.done { background: var(--accent-dim); }
 .tick.current { background: var(--accent); }
+.tick.view { border-radius: 50%; flex: 0 0 auto; width: 10px; align-self: center; height: 10px; background: transparent; box-shadow: inset 0 0 0 1.5px var(--faint); }
+.tick.view.done { box-shadow: inset 0 0 0 1.5px var(--accent-dim); }
+.tick.view.current { background: var(--accent); box-shadow: none; }
 .tick:hover { background: var(--dim); }
 .tick.current:hover { background: var(--accent); }
 
@@ -604,6 +616,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .mobile #main { flex-direction: column; }
 .mobile #reps { width: auto; max-width: none; height: 45%; border-left: 0; border-top: 1px solid var(--glass-edge); }
 .mobile #reps-body { padding-bottom: 12px; }
+.mobile.reps-full #reps { height: auto; min-height: 0; border-top: 0; }
 
 .mobile #status .hint { display: none; }       /* keyboard hints are meaningless on touch */
 .mobile #conn-banner { top: calc(46px + env(safe-area-inset-top)); }

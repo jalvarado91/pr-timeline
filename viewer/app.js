@@ -22,6 +22,10 @@ const wrapStored = store?.getItem('prtl-wrap');
 let wrapLines = wrapStored == null ? isMobile() : wrapStored === '1';
 let repsOpen = store?.getItem('prtl-reps') !== '0';
 let repsDelta = store?.getItem('prtl-repsdelta') !== '0';
+// Where views show, from ?place= (comma-separated): beside the code (default),
+// as steps of their own (step), or swapped with the code at full size (swap).
+const places = new Set((new URLSearchParams(location.search).get('place') ?? 'beside').split(','));
+let swapped = false;   // swap mode: the views are showing instead of the code
 
 const state = {
   timeline: null,
@@ -108,7 +112,7 @@ function keepServerAlive() {
 
 async function init() {
   keepServerAlive();
-  const res = await fetch('/api/timeline');
+  const res = await fetch(places.has('step') ? '/api/timeline?viewSteps' : '/api/timeline');
   if (!res.ok) throw new Error(`timeline failed: ${res.status}`);
   state.timeline = await res.json();
 
@@ -116,6 +120,7 @@ async function init() {
     commit.files.forEach((file, f) => {
       state.frames.push({ c, f, commit, file });
     });
+    if (commit.viewOnly) state.frames.push({ c, f: 0, commit, file: null });   // a view step
   });
   if (!state.frames.length) throw new Error('no commits to step through in this range');
 
@@ -315,8 +320,15 @@ async function loadFrame(idx, at) {
   const token = ++state.navToken;
   state.frameIdx = Math.max(0, Math.min(idx, state.frames.length - 1));
   const fr = frame();
+  if (!fr.file) state.repName = viewStepRep(fr.commit).name;   // a view step opens on its view
   renderChrome();
   $('change-label').textContent = '…';
+  if (!fr.file) {                             // a view step: the view stands in for the code
+    state.changes = [];
+    state.changeIdx = 0;
+    finishFrame();
+    return;
+  }
 
   let payload;
   try {
@@ -438,7 +450,8 @@ function revealCurrent() {
   const change = state.changes[state.changeIdx];
   const editor = diffEditor.getModifiedEditor();
   const n = state.changes.length;
-  $('change-label').textContent = n ? `change ${state.changeIdx + 1}/${n}` : 'no text changes';
+  $('change-label').textContent = n ? `change ${state.changeIdx + 1}/${n}`
+    : frame().file ? 'no text changes' : 'view step';
   updateScrubber();
   updateHash();
   if (!change) return;
@@ -474,9 +487,9 @@ function renderChrome() {
   bodyEl.textContent = fr.commit.body;
   bodyEl.hidden = !fr.commit.body;
 
-  const dir = fr.file.path.includes('/')
-    ? fr.file.path.slice(0, fr.file.path.lastIndexOf('/') + 1) : '';
-  const name = fr.file.path.slice(dir.length);
+  const path = fr.file?.path ?? viewStepRep(fr.commit).path;
+  const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : '';
+  const name = path.slice(dir.length);
   $('file-label').innerHTML = '';
   const dirSpan = document.createElement('span');
   dirSpan.className = 'dir';
@@ -493,11 +506,14 @@ function renderChrome() {
    shown beside the code as they stand at the current commit. */
 
 async function renderReps() {
-  const { commit } = frame();
+  const { commit, file } = frame();
   const reps = commit.reps;
   const panel = $('reps');
-  panel.hidden = !repsOpen || !reps.length;
+  const full = !file || (places.has('swap') && swapped);   // the views take the code's place
+  panel.hidden = !reps.length || !(full || (repsOpen && !places.has('swap')));
   document.documentElement.classList.toggle('reps-open', !panel.hidden);
+  document.documentElement.classList.toggle('reps-full', full && !panel.hidden);
+  $('tb-reps').classList.toggle('changed', panel.hidden && reps.some((r) => r.changed));
   syncBarButtons();
   if (panel.hidden) return;
 
@@ -574,9 +590,17 @@ function lineDiff(before, after) {
   return out;
 }
 
+// The view a view step is about: the one its commit changed.
+function viewStepRep(commit) {
+  return commit.reps.find((r) => r.changed) ?? commit.reps[0];
+}
+
 function toggleReps() {
-  repsOpen = !repsOpen;
-  store?.setItem('prtl-reps', repsOpen ? '1' : '0');
+  if (places.has('swap')) swapped = !swapped;   // flip the code area between code and views
+  else {
+    repsOpen = !repsOpen;
+    store?.setItem('prtl-reps', repsOpen ? '1' : '0');
+  }
   renderReps();
 }
 
@@ -603,7 +627,12 @@ function renderScrubber() {
       tick.dataset.frame = String(fi++);
       seg.appendChild(tick);
     });
-    if (!commit.files.length) seg.appendChild(document.createElement('div')).className = 'tick';
+    if (commit.viewOnly) {                 // a view step: one tick, marked as a view
+      const tick = seg.appendChild(document.createElement('div'));
+      tick.className = 'tick view';
+      tick.title = `${commit.subject}\nview`;
+      tick.dataset.frame = String(fi++);
+    }
     el.appendChild(seg);
   });
   bindScrubberDrag();
