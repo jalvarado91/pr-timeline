@@ -18,7 +18,8 @@
 +                state: showDecided (false)             decided changes hidden behind a toggle
 +                query: admin.editRequests(batchId ? { batchId } : {})
 +                mutation: admin.applyEditRequestBatch (only when filtered to a batch with >1 waiting)
-+                rows: one per change; the batch is a label you can filter by
++                rows: one per change, "from <batch>" as text in the row;
++                ?batch (set from the dashboard) filters, onClearBatch clears
 +                <Pill>{statusWord(status)}</Pill>       "open" shown as "waiting"
 
  Left behind: function BatchView is still defined in EditRequests.tsx at c3677a2,

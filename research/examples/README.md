@@ -6,7 +6,8 @@ Each one is one representation from the research page "How others show an
 agent's change", drawn on this PR so the representations can be compared.
 
 All of them were written by hand, by an agent reading the commits, except the
-`03-calldiff*` files, which are real `calldiff` output on this repo (see below).
+`03-calldiff*` files, which are real `calldiff` output on this repo (listed in the table below; the
+comparison is in the research page's "calldiff on PR #5" section).
 
 One example uses a second subject: `01-component-tree.soulector-c3677a2.diff`
 is from `~/Code/soulector-next` (read only), because pr-timeline has no UI
@@ -65,7 +66,7 @@ A per-PR file carries `pr5`.
 | 2 call tree | `02-call-tree.pr5-view-skill.txt`, `02-call-tree.step02-83a4743.txt` (Production / Tests) | per-PR + per-step |
 | 3 shape diff (hand-written) | `03-call-tree-diff.step01-2ddcce6.diff`, `.step02-83a4743.diff`, `.step05-fa718bf.diff`, `.step06-ba53054.diff`, `.step07-ef00662.diff` | per-step |
 | 3 shape diff (calldiff 0.5.0, npm) | `03-calldiff.step01-2ddcce6.keepServerAlive.txt`, `.loadFrame.txt`, `.all-entries.txt`; `03-calldiff.step02/05/06/07-*.txt` ("No callstack changes") | per-step |
-| 3 shape diff (calldiff 0.6.0, unreleased, built from GitHub 2086f6e) | `03-calldiff-0.6.step01-2ddcce6.keepServerAlive.txt` | per-step |
+| 3 shape diff (calldiff 0.6.0, unreleased, built from GitHub 2086f6e) | `03-calldiff-0.6.step01-2ddcce6.keepServerAlive.txt`, `.all-entries.txt` | per-step |
 | 4 file tree | `04-file-tree.pr5.diff`, `04-file-tree.step01..03-*.diff` | per-PR + per-step |
 | 5 pseudocode | `05-pseudocode.step05..07-*.diff`, `05-pseudocode.pr5-head.txt` | per-step + per-PR |
 | 6 types and contracts | `06-contracts.step01-2ddcce6.diff`, `06-contracts.step11-0cb56d0.diff` | per-step |
