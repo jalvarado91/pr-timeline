@@ -16,6 +16,10 @@
 -  pr-timeline: replaying <branch> (<base7>..) from <repo>
 +  pr-timeline: showing <branch> (<base7>..) from <repo>
 
+ viewer banner (#conn-msg, viewer/index.html)
+-  "Viewer server disconnected — it may have retired while idle. Relaunch the replay, then retry."
++  "Viewer server disconnected — it may have retired while idle. Relaunch the viewer, then retry."
+
  viewer error when the range is empty
 -  "no commits to replay on this branch"
 +  "no commits to step through in this range"

@@ -1,0 +1,4 @@
+# calldiff 0.5.0, run on this repo (computed, not hand-written).
+# $ npx calldiff@0.5.0 diff fa718bf^ fa718bf
+
+No callstack changes between fa718bf^ and fa718bf.

@@ -1,0 +1,24 @@
+# calldiff 0.5.0, run on this repo (computed, not hand-written).
+# $ npx calldiff@0.5.0 diff 2ddcce6^ 2ddcce6 --entry keepServerAlive
+
+calldiff diff 2ddcce6^ → 2ddcce6
+
+  keepServerAlive()
+- ├─ try
+-    └─ new EventSource()
+- ├─ catch
++ ├─ openLiveness()
++ │  ├─ try
++ │     ├─ liveness.close()
++ │     └─ new EventSource()
++ │  └─ catch
++ ├─ document.addEventListener()
++ ├─ window.addEventListener()
++ ├─ setInterval()
++ ├─ addEventListener()
++ └─ $(id)
++    └─ document.getElementById()
+cta:
+  description: "Suggested command:"
+  commands[1]{command,description}:
+    calldiff tree --entry keepServerAlive,View full call tree for keepServerAlive

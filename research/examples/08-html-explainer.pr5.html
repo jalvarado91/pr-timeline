@@ -38,7 +38,7 @@ p { margin: 0 0 10px; } .dim { color: var(--dim); } code, .mono { font-family: u
 <body>
 <main>
 <h1>PR #5: view any range, and notice a dead server</h1>
-<p class="dim">99feee1..da9a69c · 13 steps · an HTML explainer in the shape HumanLayer's show-me skill asks for ("boxes and lines, code snippets"). Hand-written from the commits.</p>
+<p class="dim">99feee1..da9a69c · 13 steps · an HTML explainer of the kind HumanLayer's show-me skill asks for ("one focused HTML file — a diagram, an infographic, or a short slide deck"). Hand-written from the commits.</p>
 
 <p>This PR does two separate things. The <b>view skill</b> replaces the replay skill: any target an agent is handed becomes a <code>BASE..HEAD</code> range. The <b>viewer</b> learns to tell when its server has gone, instead of quietly ignoring presses.</p>
 
@@ -47,11 +47,11 @@ p { margin: 0 0 10px; } .dim { color: var(--dim); } code, .mono { font-family: u
 <div class="lanes">
   <div class="lane">
     <h3>Before: skills/replay</h3>
-    <div class="box"><div class="t">/pr-timeline:replay [name]</div><div class="s">only replay/* branches</div></div>
+    <div class="box del"><div class="t">/pr-timeline:replay [name]</div><div class="s">only replay/* branches</div></div>
     <div class="arrow">↓</div>
-    <div class="box"><div class="t">newest replay/* branch</div><div class="s">git for-each-ref refs/heads/replay/</div></div>
+    <div class="box del"><div class="t">newest replay/* branch</div><div class="s">git for-each-ref refs/heads/replay/</div></div>
     <div class="arrow">↓</div>
-    <div class="box"><div class="t">serve --daemon</div><div class="s">base auto-detected unless passed</div></div>
+    <div class="box del"><div class="t">serve --daemon</div><div class="s">base auto-detected unless passed</div></div>
   </div>
   <div class="lane">
     <h3>After: skills/view</h3>
@@ -64,6 +64,7 @@ p { margin: 0 0 10px; } .dim { color: var(--dim); } code, .mono { font-family: u
       <div class="box add"><div class="t">a..b</div><div class="s">as written</div></div>
       <div class="box add"><div class="t">sha</div><div class="s">sha^..sha; not a root</div></div>
       <div class="box add"><div class="t">path</div><div class="s">what's checked out</div></div>
+      <div class="box add"><div class="t">X vs Y</div><div class="s">base = merge-base X, Y</div></div>
     </div>
     <div class="arrow">↓</div>
     <div class="box add"><div class="t">rev-list --count --no-merges</div><div class="s">0 → say so, don't serve</div></div>

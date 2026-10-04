@@ -1,0 +1,25 @@
+# Component tree diff: soulector-next c3677a2 (2026-09-14)
+# "refactor(admin): one list of changes, not three screens to reach one"
+# A second subject, because pr-timeline has no UI components. Read only from
+# ~/Code/soulector-next; hand-written from src/client/AdminScreen/EditRequests.tsx
+# at c3677a2^ and c3677a2. Dex Horthy's shape: each node with its state,
+# queries and callbacks.
+
+ <EditRequestsScreen>                       route state in the URL: ?batch, ?request → ?change (request still read)
+-  ?request  → <RequestView id onBack>
++  ?change   → <ChangeView id backLabel onBack>        renamed; backLabel "Batch" | "All changes"
+-  ?batch    → <BatchView batchId onBack onOpen>
+-                query: admin.editRequests({ batchId })
+-                mutation: admin.applyEditRequestBatch
+-  (none)    → <BatchList onBack onOpen(batchId)>
+-                query: admin.editRequestBatches
+-                rows: one per batch, "N waiting" | "done"
++  (none)    → <ChangeList batchId? onBack onOpen(changeId) onClearBatch>
++                state: showDecided (false)             decided changes hidden behind a toggle
++                query: admin.editRequests(batchId ? { batchId } : {})
++                mutation: admin.applyEditRequestBatch (only when filtered to a batch with >1 waiting)
++                rows: one per change; the batch is a label you can filter by
++                <Pill>{statusWord(status)}</Pill>       "open" shown as "waiting"
+
+ Left behind: function BatchView is still defined in EditRequests.tsx at c3677a2,
+ but nothing renders it any more.

@@ -31,7 +31,6 @@
       "actions": [
         { "rows": [0, 2], "label": "BASE = merge-base with default branch" },
         { "rows": [3, 3], "label": "BASE = merge-base baseRefOid, PR head" },
-        { "rows": [4, 4], "label": "" },
         { "rows": [5, 5], "label": "BASE = sha^" },
         { "rows": [6, 6], "label": "BASE = merge-base first, second" }
       ]

@@ -3,7 +3,7 @@
 #
 # The viewer has no framework, so the "components" are the page's regions in
 # viewer/index.html, each with the viewer/app.js functions that own it.
-# Hand-written from the commit. Only regions that matter here are expanded.
+# Hand-written from the commit. Regions this step does not touch are omitted (e.g. #topbar-style, #help).
 
  <body>  (viewer/index.html)
    module state: state{frames, frameIdx, changes, changeIdx, navToken, ...}

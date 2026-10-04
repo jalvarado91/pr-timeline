@@ -99,8 +99,10 @@ function serverClock(s, log) {
   if (s.server !== 'running') return;
   if (!s.serverSeesTab && s.idleMinutes >= IDLE_LIMIT) {
     s.server = 'retired';
-    s.heartbeat = 'reconnecting';
+    // The server only retires idle when it no longer counts this tab, so the tab's
+    // heartbeat is already dead: half-open (no signal arrives) or already retrying.
     log.push(`server: no tab holds /api/events and nothing for ${IDLE_LIMIT} min → server exits`);
+    if (s.heartbeat === 'open') log.push('tab: its half-open heartbeat gets no signal, so nothing happens yet');
   }
 }
 
@@ -137,7 +139,9 @@ const actions = {
   },
   netDown(s, log) {
     s.online = false; s.serverSeesTab = false; s.heartbeat = 'reconnecting';
-    log.push('network drops; the heartbeat drops with it');
+    log.push('network drops; the heartbeat errors and EventSource retries');
+    log.push('still not open after 4 s → verifyConnection');
+    probe(s, 'viewer: heartbeat error check', log);
   },
   netUp(s, log) {
     s.online = true; log.push('network back → online event');
@@ -154,6 +158,21 @@ const actions = {
     if (s.online && s.heartbeat === 'reconnecting') {
       s.heartbeat = 'open'; s.serverSeesTab = true; s.banner = false;
       log.push('the retrying EventSource reconnects → onopen → banner hidden' + (s.stepLoaded ? '' : " (the step that failed still says couldn't load)"));
+    } else if (s.heartbeat === 'open' && !s.serverSeesTab) {
+      log.push('the tab still thinks its half-open heartbeat is open, so it does not reconnect; the banner stays until the next probe');
+    }
+  },
+  exitAfter(s, log) {
+    if (s.server !== 'running') { log.push('server is not running'); return; }
+    s.server = 'retired';
+    log.push('server reaches --exit-after (12 h by default) and exits, tab or no tab');
+    if (s.serverSeesTab) {
+      s.serverSeesTab = false; s.heartbeat = 'reconnecting';
+      log.push('tab: the live heartbeat errors; EventSource retries');
+      log.push('still not open after 4 s → verifyConnection');
+      probe(s, 'viewer: heartbeat error check', log);
+    } else if (s.heartbeat === 'open') {
+      log.push('tab: its half-open heartbeat gets no signal, so nothing happens yet');
     }
   },
   retry(s, log) {
@@ -163,6 +182,8 @@ const actions = {
   stranger(s, log) {
     s.server = 'stranger'; s.serverSeesTab = false; s.heartbeat = 'reconnecting';
     log.push('the server is gone and another program now listens on its port');
+    log.push('the heartbeat errors; still not open after 4 s → verifyConnection');
+    probe(s, 'viewer: heartbeat error check', log);
   },
 };
 
@@ -177,7 +198,7 @@ const LABELS = {
   wait5: 'Wait 5 minutes', silentDrop: 'Heartbeat silently dies', visibleDrop: 'Heartbeat errors',
   hideTab: 'Hide the tab', showTab: 'Show the tab', netDown: 'Network drops', netUp: 'Network returns',
   nextStep: 'Press → (next step)', relaunch: 'Relaunch the viewer', retry: 'Press retry on the banner',
-  stranger: 'Another program takes the port',
+  stranger: 'Another program takes the port', exitAfter: 'Server hits --exit-after',
 };
 const FIELDS = [
   ['minute', 'Time', s => `t+${s.minute} min`],
@@ -195,14 +216,17 @@ const SCENARIOS = [
     desc: 'The reader stays on one step for 20 minutes. Early on, the heartbeat goes half-open, which used to let the server exit at 15 minutes. Watch the 5-minute probe keep it alive.',
     steps: ['silentDrop', 'wait5', 'wait5', 'wait5', 'wait5', 'nextStep'] },
   { name: 'Long read, background tab',
-    desc: 'Same, but the tab sits in the background, so nothing probes. The server exits; coming back shows the banner and the next press fails. Relaunching clears the banner on its own, because the heartbeat reconnects.',
-    steps: ['hideTab', 'silentDrop', 'wait5', 'wait5', 'wait5', 'showTab', 'nextStep', 'relaunch', 'nextStep'] },
+    desc: 'Same, but the tab sits in the background, so nothing probes. The server exits; coming back shows the banner and the next press fails. The heartbeat is half-open, so relaunching alone changes nothing on screen: retry does. Afterwards only the probes keep the server alive, because the code re-opens the heartbeat only when it reads closed.',
+    steps: ['hideTab', 'silentDrop', 'wait5', 'wait5', 'wait5', 'showTab', 'nextStep', 'relaunch', 'retry'] },
+  { name: 'Server reaches its 12-hour limit',
+    desc: 'A healthy heartbeat and a visible tab. When the server exits at --exit-after, the heartbeat errors, and 4 seconds later the probe raises the banner with no press needed.',
+    steps: ['exitAfter', 'relaunch'] },
   { name: 'Network blip',
-    desc: 'The network drops for a moment. A press while offline fails and raises the banner; the network returning clears it, and the next press loads.',
-    steps: ['netDown', 'nextStep', 'netUp', 'nextStep'] },
+    desc: 'The network drops for a moment. The heartbeat errors and, 4 seconds later, the banner shows. The network returning clears it, and the next press loads.',
+    steps: ['netDown', 'netUp', 'nextStep'] },
   { name: 'Someone else on the port',
     desc: 'The server is gone and another program answers on its port. /api/status answers, but not as pr-timeline, so the viewer still says disconnected.',
-    steps: ['stranger', 'wait5', 'retry'] },
+    steps: ['stranger', 'retry'] },
 ];
 
 let state = initial(), prev = state, logLines = ['Start: tab open, heartbeat open, server running.'];

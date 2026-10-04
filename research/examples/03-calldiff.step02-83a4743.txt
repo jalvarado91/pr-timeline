@@ -1,0 +1,4 @@
+# calldiff 0.5.0, run on this repo (computed, not hand-written).
+# $ npx calldiff@0.5.0 diff 83a4743^ 83a4743
+
+No callstack changes between 83a4743^ and 83a4743.

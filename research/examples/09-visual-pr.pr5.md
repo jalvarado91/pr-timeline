@@ -58,11 +58,13 @@ The viewer probes its server and re-opens the heartbeat; when the server is gone
 Files:
 
 ```diff
+~README.md                                # leads with viewing any range
+~package.json, .claude-plugin/*.json      # descriptions lead with the viewer
  skills/
 -├── replay/SKILL.md
-+├── view/SKILL.md          # any target → BASE..HEAD
-~└── atomize/SKILL.md       # hands off to view
- bin/pr-timeline.mjs        # --no-merges; help text says "range"
- test/timeline.test.mjs     # + merges are skipped
- viewer/{app.js,index.html,style.css}   # disconnected banner, probes
++├── view/SKILL.md                        # any target → BASE..HEAD
+~└── atomize/SKILL.md                     # hands off to view
+~bin/pr-timeline.mjs                      # --no-merges; help text says "range"
+~test/timeline.test.mjs                   # + merges are skipped
+~viewer/{app.js,index.html,style.css}     # disconnected banner, probes
 ```
