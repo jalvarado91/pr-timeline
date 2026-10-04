@@ -497,7 +497,7 @@ function renderChrome() {
   bodyEl.textContent = fr.commit.body;
   bodyEl.hidden = !fr.commit.body;
 
-  const path = fr.file?.path ?? viewStepRep(fr.commit).path;
+  const path = fr.file?.path ?? viewStepRep(fr.commit).name;   // a view step: just the view
   const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : '';
   const name = path.slice(dir.length);
   $('file-label').innerHTML = '';
