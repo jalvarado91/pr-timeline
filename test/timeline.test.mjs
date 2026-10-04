@@ -98,14 +98,19 @@ test('loadTimeline lists reps per step and keeps them out of files', () => {
   writeFileSync(path.join(repsDir, 'x.mmd'), 'graph TD\n');
   git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'code plus rep');
 
+  writeFileSync(path.join(repsDir, 'x.mmd'), 'graph TD\n  a --> b\n');
+  git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'rep only');
+
   writeFileSync(path.join(repo, 'c.js'), 'call();\ncall();\n');
   git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'code only');
 
-  const { commits: [withRep, codeOnly] } = loadTimeline(repo, repBase, 'main');
+  const { commits } = loadTimeline(repo, repBase, 'main');
+  assert.deepEqual(commits.map((c) => c.subject), ['code plus rep', 'code only'], 'a rep-only commit is no step');
+  const [withRep, codeOnly] = commits;
   assert.deepEqual(withRep.files.map((f) => f.path), ['c.js']);
   assert.deepEqual(withRep.reps, [{ path: '.pr-timeline/reps/x.mmd', name: 'x.mmd', changed: true }]);
   assert.deepEqual(codeOnly.reps, [{ path: '.pr-timeline/reps/x.mmd', name: 'x.mmd', changed: false }]);
 
-  const { commits: plain } = loadTimeline(repo, base, 'main~3');
+  const { commits: plain } = loadTimeline(repo, base, 'main~4');
   assert.ok(plain.every((c) => c.reps.length === 0), 'a rep-less range lists no reps');
 });

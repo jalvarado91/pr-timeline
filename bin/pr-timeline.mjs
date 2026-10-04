@@ -155,13 +155,18 @@ function loadTimeline(repo, base, branch) {
     // the code diff.
     const isRep = (p) => p?.startsWith(REPS_DIR);
     const touched = new Set(files.filter((f) => isRep(f.path)).map((f) => f.path));
-    commit.files = files.filter((f) => !isRep(f.path) && !isRep(f.oldPath));
+    commit.files = files.filter((f) => !isRep(f.path));
+    for (const f of commit.files) {
+      if (isRep(f.oldPath)) { f.status = 'A'; delete f.oldPath; }   // moved out of reps: new code
+    }
     commit.reps = gitText(repo, [
       'diff', '--name-only', '--diff-filter=d', '-z', base, commit.sha, '--', REPS_DIR,
     ]).split('\0').filter(Boolean)
       .map((p) => ({ path: p, name: p.slice(REPS_DIR.length), changed: touched.has(p) }));
   }
-  return { commits, style };
+  // A commit that only touched reps has no code to step through; its reps
+  // still show at the next step, since they're read cumulatively from base.
+  return { commits: commits.filter((c) => c.files.length), style };
 }
 
 // Pull a trailing `Narrative-Style: <id>` line off a commit body, mutating the
