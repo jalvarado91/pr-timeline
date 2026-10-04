@@ -189,7 +189,8 @@ always be empty):
 git diff --stat replay/<name> $SRC_SHA -- . ':!.pr-timeline'
 ```
 
-This **must be empty** (reps are the one thing the replay adds). If it isn't, sync the remainder — `git checkout $SRC_SHA -- .`
+This **must be empty** (reps are the one thing the replay adds). If it isn't,
+sync the remainder — `git checkout $SRC_SHA -- .`
 — and either amend it into the final commit (if it belongs there) or add one
 more terse commit. Re-run the check. Never leave the branch differing from
 `$SRC_SHA`.

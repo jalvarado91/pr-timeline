@@ -527,7 +527,7 @@ async function renderReps() {
     payload = await fetchFile({ commit, file: { path: rep.path, status: rep.changed ? 'M' : 'A' } });
   } catch (err) {
     verifyConnection();
-    payload = { after: `couldn't load ${rep.name}: ${err.message ?? err}`, before: '' };
+    payload = { after: `couldn't load ${rep.name}: ${err.message ?? err}`, before: '', failed: true };
   }
   if (body.dataset.key !== key) return;    // stepped on while loading
   const lines = rep.changed && repsDelta
@@ -548,6 +548,7 @@ async function renderReps() {
   }
   body.scrollTop = 0;
   firstChange?.scrollIntoView({ block: 'nearest' });
+  if (payload.failed) body.dataset.key = '';   // let retry load it again
 }
 
 /* Line diff by longest common subsequence: views are short, so the
@@ -566,8 +567,8 @@ function lineDiff(before, after) {
   let i = 0, j = 0;
   while (i < a.length || j < b.length) {
     if (i < a.length && j < b.length && a[i] === b[j]) { out.push([' ', a[i]]); i++; j++; }
-    else if (j < b.length && (i === a.length || L[i][j + 1] >= L[i + 1][j])) out.push(['+', b[j++]]);
-    else out.push(['-', a[i++]]);
+    else if (i < a.length && (j === b.length || L[i + 1][j] >= L[i][j + 1])) out.push(['-', a[i++]]);
+    else out.push(['+', b[j++]]);
   }
   return out;
 }
