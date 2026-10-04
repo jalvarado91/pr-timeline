@@ -185,7 +185,7 @@ function extractStyle(commits) {
 
 function showFile(repo, ref, filePath) {
   try {
-    const buf = git(repo, ['show', `${ref}:${filePath}`]);
+    const buf = git(repo, ['show', `${ref}:${filePath}`], { stdio: ['ignore', 'pipe', 'ignore'] });   // a missing side is expected
     if (buf.subarray(0, 8000).includes(0)) return { binary: true };
     return { content: buf.toString('utf8') };
   } catch {
