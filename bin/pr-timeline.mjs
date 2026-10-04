@@ -153,7 +153,8 @@ function loadTimeline(repo, base, branch, { viewSteps = false } = {}) {
     // Representations ride along under .pr-timeline/reps/; keep them out of
     // the code diff.
     commit.files = files.filter((f) => !isRep(f.path));
-    commit.viewOnly = !commit.files.length && files.length > 0;
+    // a view step needs a view to show: deleting the only one leaves nothing
+    commit.viewOnly = !commit.files.length && files.some((f) => f.status !== 'D');
     for (const f of commit.files) {
       if (isRep(f.oldPath)) { f.status = 'A'; delete f.oldPath; }   // moved out of reps: new code
     }

@@ -122,6 +122,11 @@ test('loadTimeline lists reps per step and keeps them out of files', () => {
   assert.equal(withViews[1].reps[0].changed, true);
   assert.equal(withViews[2].reps[0].changed, false, 'the view step already showed it');
 
-  const { commits: plain } = loadTimeline(repo, base, 'main~4');
+  // a commit that only deletes a view has no view to show, so no step
+  git(repo, 'rm', '-q', '.pr-timeline/reps/x.mmd'); git(repo, 'commit', '-q', '-m', 'drop rep');
+  const { commits: afterDrop } = loadTimeline(repo, repBase, 'main', { viewSteps: true });
+  assert.ok(!afterDrop.some((c) => c.subject === 'drop rep'));
+
+  const { commits: plain } = loadTimeline(repo, base, 'main~5');
   assert.ok(plain.every((c) => c.reps.length === 0), 'a rep-less range lists no reps');
 });
