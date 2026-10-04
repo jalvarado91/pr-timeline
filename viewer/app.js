@@ -283,8 +283,15 @@ function syncBarButtons() {
 
 function frame() { return state.frames[state.frameIdx]; }
 
+// While a view fills the code area, the code's changes are out of sight, so
+// stepping walks commits: every step then shows something.
+const viewFills = () => !frame().file || (places.has('swap') && swapped);
+
 async function next() {
-  if (state.changeIdx < state.changes.length - 1) {
+  if (viewFills()) {
+    const c = frame().c;
+    if (c < state.timeline.commits.length - 1) await loadFrame(firstFrameOfCommit(c + 1), 0);
+  } else if (state.changeIdx < state.changes.length - 1) {
     state.changeIdx++;
     revealCurrent();
   } else if (state.frameIdx < state.frames.length - 1) {
@@ -293,7 +300,10 @@ async function next() {
 }
 
 async function prev() {
-  if (state.changeIdx > 0) {
+  if (viewFills()) {
+    const c = frame().c;
+    if (c > 0) await loadFrame(firstFrameOfCommit(c - 1), 0);
+  } else if (state.changeIdx > 0) {
     state.changeIdx--;
     revealCurrent();
   } else if (state.frameIdx > 0) {
