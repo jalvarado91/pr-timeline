@@ -172,7 +172,9 @@ the code: a call tree, a component tree, a file tree, types, pseudocode, or a
 `.diff` gets +/- colouring; anything else shows as plain text.
 
 - Commit a rep **in the same commit as the code it describes**. A commit that
-  touches only reps is no step, so its view first shows at the next one.
+  touches only reps is no step, so its view first shows at the next one. (The
+  experimental `?place=step` shows such a commit as a view step instead, which
+  can set up the code steps after it.)
 - Edit a rep in the step that changes what it shows; the viewer marks it and
   shows what changed against the previous step. Leave it alone otherwise; it
   keeps showing as it stands.
