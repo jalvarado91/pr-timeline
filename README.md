@@ -95,10 +95,7 @@ second commit subject
 - `v` (or `views`) shows other views of the step beside the code, such as a
   call tree or a file-tree diff, when the replay carries them under
   `.pr-timeline/reps/` (see the atomize skill). A dot marks the views the step
-  changed, and `d` toggles showing what it changed. Two experimental
-  placements: `?place=step` makes a commit that only changes views a step of
-  its own, shown full size in place of the code, and `?place=swap` drops the
-  split for a full-size view that `v` flips with the code.
+  changed, and `d` toggles showing what it changed.
 - Merge commits are skipped: a merge has no single-parent diff, so it would be
   a step you can't enter. A branch that merged `main` mid-flight shows the
   commits authored on it. Uncommitted work isn't shown at all — every step
