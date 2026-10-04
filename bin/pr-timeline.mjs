@@ -161,9 +161,10 @@ function loadTimeline(repo, base, branch, { viewSteps = false } = {}) {
   }
   // A commit that only touched reps has no code to step through, so it is no
   // step, unless the viewer asks for view steps (it then shows the view in
-  // place of the code). Each step lists the reps that stand at it (added since base, so reps
-  // merged into base don't leak in) and marks the ones that changed since the
-  // previous step, so a rep-only commit's edit lands on the next step.
+  // place of the code). Each step lists the reps that stand at it (added
+  // since base, so reps merged into base don't leak in) and marks the ones
+  // that changed since the previous step, so a rep-only commit's edit lands
+  // on the next step.
   const steps = commits.filter((c) => c.files.length || (viewSteps && c.viewOnly));
   const repsChanged = (from, to) => gitText(repo, [
     'diff', '--name-only', '--diff-filter=d', '-z', from, to, '--', REPS_DIR,
