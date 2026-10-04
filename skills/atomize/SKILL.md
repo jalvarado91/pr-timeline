@@ -163,6 +163,22 @@ Rules while editing intermediate states:
 - Deletions of replaced code get their own step near the end ("retire X") when
   meaningful, or ride along with the commit that replaces them.
 
+### Representations (optional)
+
+A step can also carry other views of the change, which the viewer shows beside
+the code: a call tree, a component tree, a file tree, types, pseudocode, or a
+`diff` drawn over any of them. Write each as one file under
+`.pr-timeline/reps/` in the step's tree (`call-tree.diff`, `file-tree.txt`).
+`.diff` gets +/- colouring; anything else shows as plain text.
+
+- Commit a rep **in the same commit as the code it describes**. A commit that
+  touches only reps is no step, so its view first shows at the next one.
+- Edit a rep in the step that changes what it shows; the viewer marks it and
+  shows what changed against the previous step. Leave it alone otherwise; it
+  keeps showing as it stands.
+- Reps belong on the replay branch only; `.pr-timeline/` paths never show in
+  the code diff.
+
 ## 5. Verify exactness, then hand off
 
 After the last step, still inside the worktree, diff the replay branch against
@@ -170,10 +186,10 @@ the **source SHA** (not `HEAD` — that is the replay branch itself, so it would
 always be empty):
 
 ```
-git diff --stat replay/<name> $SRC_SHA
+git diff --stat replay/<name> $SRC_SHA -- . ':!.pr-timeline'
 ```
 
-This **must be empty**. If it isn't, sync the remainder — `git checkout $SRC_SHA -- .`
+This **must be empty** (reps are the one thing the replay adds). If it isn't, sync the remainder — `git checkout $SRC_SHA -- .`
 — and either amend it into the final commit (if it belongs there) or add one
 more terse commit. Re-run the check. Never leave the branch differing from
 `$SRC_SHA`.
