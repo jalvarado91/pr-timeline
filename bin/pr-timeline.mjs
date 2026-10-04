@@ -11,6 +11,7 @@ import path from 'node:path';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const VIEWER_DIR = path.join(ROOT, 'viewer');
+const REPS_DIR = '.pr-timeline/reps/';
 const MONACO_DIR = path.join(ROOT, 'node_modules', 'monaco-editor', 'min', 'vs');
 
 function usage(code = 0) {
@@ -148,7 +149,17 @@ function loadTimeline(repo, base, branch) {
       const s = stats.get(f.path) ?? { additions: 0, deletions: 0, binary: false };
       Object.assign(f, s);
     }
-    commit.files = files;
+    // Representations ride along under .pr-timeline/reps/: list the ones that
+    // stand at this step (added since base, so reps merged into base don't
+    // leak in), mark the ones this commit touched, and keep them all out of
+    // the code diff.
+    const isRep = (p) => p?.startsWith(REPS_DIR);
+    const touched = new Set(files.filter((f) => isRep(f.path)).map((f) => f.path));
+    commit.files = files.filter((f) => !isRep(f.path) && !isRep(f.oldPath));
+    commit.reps = gitText(repo, [
+      'diff', '--name-only', '--diff-filter=d', '-z', base, commit.sha, '--', REPS_DIR,
+    ]).split('\0').filter(Boolean)
+      .map((p) => ({ path: p, name: p.slice(REPS_DIR.length), changed: touched.has(p) }));
   }
   return { commits, style };
 }

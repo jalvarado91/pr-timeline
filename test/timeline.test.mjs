@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { loadTimeline, extractStyle } from '../bin/pr-timeline.mjs';
@@ -82,4 +82,30 @@ test('loadTimeline skips merge commits', () => {
   assert.ok(!commits.some((c) => c.subject.startsWith('Merge ')), 'no merge commits');
   assert.ok(commits.every((c) => c.files.length > 0), 'every step has files to show');
   assert.ok(commits.some((c) => c.subject === 'add feature'), 'branch work is kept');
+});
+
+// Representations under .pr-timeline/reps/ travel with the commits but never
+// show up as code; reps already on base don't leak into the range.
+test('loadTimeline lists reps per step and keeps them out of files', () => {
+  const { repo, base } = fixture();
+  const repsDir = path.join(repo, '.pr-timeline', 'reps');
+  mkdirSync(repsDir, { recursive: true });
+  writeFileSync(path.join(repsDir, 'old.txt'), 'on base already\n');
+  git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'rep on base');
+  const repBase = git(repo, 'rev-parse', 'HEAD').trim();
+
+  writeFileSync(path.join(repo, 'c.js'), 'call();\n');
+  writeFileSync(path.join(repsDir, 'x.mmd'), 'graph TD\n');
+  git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'code plus rep');
+
+  writeFileSync(path.join(repo, 'c.js'), 'call();\ncall();\n');
+  git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'code only');
+
+  const { commits: [withRep, codeOnly] } = loadTimeline(repo, repBase, 'main');
+  assert.deepEqual(withRep.files.map((f) => f.path), ['c.js']);
+  assert.deepEqual(withRep.reps, [{ path: '.pr-timeline/reps/x.mmd', name: 'x.mmd', changed: true }]);
+  assert.deepEqual(codeOnly.reps, [{ path: '.pr-timeline/reps/x.mmd', name: 'x.mmd', changed: false }]);
+
+  const { commits: plain } = loadTimeline(repo, base, 'main~3');
+  assert.ok(plain.every((c) => c.reps.length === 0), 'a rep-less range lists no reps');
 });
