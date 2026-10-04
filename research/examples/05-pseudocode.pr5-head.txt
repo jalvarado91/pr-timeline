@@ -1,0 +1,22 @@
+# Pseudocode: how the view skill turns a target into a range
+# At the end of PR #5 (da9a69c). Hand-written from skills/view/SKILL.md.
+
+view(target)
+  REPO = named worktree or checkout, else the current repo
+  if target is a path           → treat as "nothing", run inside REPO
+                                   (detached HEAD → HEAD = its SHA)
+  (HEAD, BASE) = match target
+    nothing    → (current branch, merge-base with default)
+                  if current branch is the default → ask what to show
+    branch     → (branch or origin/branch, merge-base with default)
+    PR n       → (the PR head, merge-base with the PR's own base commit)
+    a..b       → (b, a)
+    sha        → (sha, sha^)        root commit → can't be shown
+    X vs Y     → (Y, merge-base(X, Y))
+  verify both ends are commits
+  n = non-merge commits in BASE..HEAD           // what the viewer will step through
+  if n == 0
+    report "nothing to step through"
+    if it was merged through a PR → offer the PR
+    return
+  serve(REPO, BASE, HEAD) as a daemon; report URL and keys

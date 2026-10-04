@@ -1,0 +1,6 @@
+# File-tree diff, step 3 of PR #5 (b61f4f0)
+# "Grow the replay launcher into a general view skill"
+
+ skills/
+-├── replay/SKILL.md   # launched the viewer for the newest replay/* branch   (-50)
++└── view/SKILL.md     # NEW: resolves any target to BASE..HEAD, then serves   (+100)

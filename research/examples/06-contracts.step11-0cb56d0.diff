@@ -1,0 +1,21 @@
+# CLI contract, step 11 of PR #5 (0cb56d0)
+# "Describe the CLI and viewer in terms of ranges, not replays"
+# Wording only: the flags take the same values as before.
+
+ pr-timeline serve
+   --repo <path>     git repository to read (default: cwd)
+-  --branch <name>   replay branch to show (default: current branch if replay/*,
++  --branch <rev>    last commit to show (default: current branch if replay/*,
+                     else most recently committed replay/* branch)
+-  --base <ref>      commit the replay starts from (default: merge-base with the
+-                    default branch)
++  --base <rev>      commit to start after (default: merge-base with the default
++                    branch)
+
+ startup line
+-  pr-timeline: replaying <branch> (<base7>..) from <repo>
++  pr-timeline: showing <branch> (<base7>..) from <repo>
+
+ viewer error when the range is empty
+-  "no commits to replay on this branch"
++  "no commits to step through in this range"

@@ -1,0 +1,7 @@
+# File-tree diff, step 1 of PR #5 (2ddcce6)
+# "surface backend disconnects and re-establish the viewer heartbeat"
+
+ viewer/
+~├── app.js       # keepServerAlive → openLiveness + verifyConnection probes   (+55 -5)
+~├── index.html   # + #conn-banner with a retry button                        (+6)
+~└── style.css    # banner styles                                             (+48)

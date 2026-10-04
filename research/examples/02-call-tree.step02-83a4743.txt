@@ -1,0 +1,24 @@
+# Call graph, step 2 of PR #5 (83a4743) "Skip merge commits in the timeline"
+# Dillon Mulroy's shape: one graph per wiring, production and tests.
+# Hand-written from bin/pr-timeline.mjs and test/timeline.test.mjs at 83a4743.
+
+Production:
+
+  browser: init() in viewer/app.js
+    → GET /api/timeline
+      → startServer request handler
+        → loadTimeline(repo, base, branch)
+          → gitText: git log --reverse --no-merges ... <base>..<branch>   ← --no-merges is new here
+          → extractStyle(commits)
+          → for each commit:
+              → gitText: git diff-tree --name-status
+              → gitText: git diff-tree --numstat
+
+Tests:
+
+  test('loadTimeline skips merge commits')        ← new here
+    → fixture()                                    (temp repo, base commit on main)
+    → git: branch feature, commit; commit on main; merge main into feature
+    → loadTimeline(repo, mergeBase, 'feature')     (imported from bin/pr-timeline.mjs)
+      → (same as production)
+    → assert: no "Merge ..." subject, every step has files, "add feature" kept

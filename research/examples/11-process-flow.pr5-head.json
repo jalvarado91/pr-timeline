@@ -1,0 +1,55 @@
+{
+  "_comment": "Entry 11, Dillon Mulroy's recipe-diagrams layout applied to the view skill at the end of PR #5 (da9a69c). Rows are input streams (target kinds), columns are stages, an action spanning several rows is a join. Same schema as his skill: rows is an inclusive zero-based range. Hand-written from skills/view/SKILL.md.",
+  "title": "view skill: from a target to a running viewer",
+  "yield": "one viewer URL, or a reason it can't open",
+  "setup": [
+    "REPO = named worktree or checkout, else the current repo",
+    "default branch = git symbolic-ref --short refs/remotes/origin/HEAD (fallback main, master)"
+  ],
+  "ingredients": [
+    "nothing (current branch)",
+    "a worktree path",
+    "a branch name",
+    "a PR number or URL",
+    "a range a..b",
+    "a single SHA",
+    "two things to compare"
+  ],
+  "columns": [
+    {
+      "actions": [
+        { "rows": [0, 0], "label": "HEAD = current branch; if it is the default, ask" },
+        { "rows": [1, 1], "label": "run as 'nothing' with git -C; detached HEAD = its SHA" },
+        { "rows": [2, 2], "label": "HEAD = branch, or origin/branch if only remote" },
+        { "rows": [3, 3], "label": "gh pr view baseRefOid; fetch +pull/n/head" },
+        { "rows": [4, 4], "label": "BASE = a, HEAD = b" },
+        { "rows": [5, 5], "label": "HEAD = sha; root commit: stop, can't be shown" },
+        { "rows": [6, 6], "label": "HEAD = second" }
+      ]
+    },
+    {
+      "actions": [
+        { "rows": [0, 2], "label": "BASE = merge-base with default branch" },
+        { "rows": [3, 3], "label": "BASE = merge-base baseRefOid, PR head" },
+        { "rows": [4, 4], "label": "" },
+        { "rows": [5, 5], "label": "BASE = sha^" },
+        { "rows": [6, 6], "label": "BASE = merge-base first, second" }
+      ]
+    },
+    {
+      "actions": [
+        { "rows": [0, 6], "label": "rev-parse --verify both ends" }
+      ]
+    },
+    {
+      "actions": [
+        { "rows": [0, 6], "label": "rev-list --count --no-merges BASE..HEAD; 0 = report and stop (offer the PR if merged through one)" }
+      ]
+    },
+    {
+      "actions": [
+        { "rows": [0, 6], "label": "npm install (first run); serve --daemon --open; report URL and keys" }
+      ]
+    }
+  ]
+}

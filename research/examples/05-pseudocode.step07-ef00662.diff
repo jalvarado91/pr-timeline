@@ -1,0 +1,11 @@
+# Pseudocode diff, step 7 of PR #5 (ef00662)
+# "Give the empty-range check a command that matches the viewer"
+
+ view(target)
+   (HEAD, BASE) = resolve(target)
+   verify both ends are commits
+-  if HEAD has no commits over BASE → report, don't serve
++  n = non-merge commits in BASE..HEAD     // count the way the viewer steps
++  if n == 0 → report, don't serve
++        // an already-merged branch lands here
+   serve(...)

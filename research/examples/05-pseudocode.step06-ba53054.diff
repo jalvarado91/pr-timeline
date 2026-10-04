@@ -1,0 +1,12 @@
+# Pseudocode diff, step 6 of PR #5 (ba53054) "Say the viewer can't show a root commit"
+
+ resolve(sha)
+   HEAD = sha
+-  BASE = sha^, or the empty tree for a root commit
++  BASE = sha^
++  root commit → can't be shown (each step diffs a commit against its parent)
+
+ what the viewer won't show
+   merge commits
++  a root commit
+   uncommitted work

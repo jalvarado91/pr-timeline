@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>View skill flow</title>
+<style>
+:root{--bg:#fbfaf7;--ink:#1d1d1b;--dim:#6b6b66;--line:#1d1d1b;--join:#eef3ff;--carry:#f3f2ee}
+@media (prefers-color-scheme: dark){:root{--bg:#17181a;--ink:#e8e6e1;--dim:#9a9890;--line:#c9c6bf;--join:#1f2a40;--carry:#202124}}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;padding:24px 16px}
+h1{font-size:18px;margin:0 0 4px} p,li{color:var(--dim)} .wrap{overflow-x:auto}
+table{border-collapse:collapse;min-width:720px;margin-top:12px}
+th,td{border:2px solid var(--line);padding:8px 10px;vertical-align:middle;text-align:left}
+th{font-weight:600;white-space:nowrap} td.join{background:var(--join)} td.carry{background:var(--carry)}
+small{color:var(--dim)}
+</style></head><body>
+<h1>view skill: from a target to a running viewer</h1>
+<p>Yield: one viewer URL, or a reason it can&#x27;t open</p>
+<p>Read left to right. Rows are kinds of target, columns are stages, and a tall cell is where streams join. Layout from Dillon Mulroy's recipe-diagrams skill; content from skills/view/SKILL.md at the end of PR #5 (da9a69c). Hand-written; rendered as HTML, not his PNG renderer.</p>
+<ul><li>REPO = named worktree or checkout, else the current repo</li><li>default branch = git symbolic-ref --short refs/remotes/origin/HEAD (fallback main, master)</li></ul>
+<div class="wrap"><table><tr><th scope="row">nothing (current branch)</th><td rowspan="1" class="">HEAD = current branch; if it is the default, ask</td><td rowspan="3" class="join">BASE = merge-base with default branch</td><td rowspan="7" class="join">rev-parse --verify both ends</td><td rowspan="7" class="join">rev-list --count --no-merges BASE..HEAD; 0 = report and stop (offer the PR if merged through one)</td><td rowspan="7" class="join">npm install (first run); serve --daemon --open; report URL and keys</td></tr><tr><th scope="row">a worktree path</th><td rowspan="1" class="">run as &#x27;nothing&#x27; with git -C; detached HEAD = its SHA</td></tr><tr><th scope="row">a branch name</th><td rowspan="1" class="">HEAD = branch, or origin/branch if only remote</td></tr><tr><th scope="row">a PR number or URL</th><td rowspan="1" class="">gh pr view baseRefOid; fetch +pull/n/head</td><td rowspan="1" class="">BASE = merge-base baseRefOid, PR head</td></tr><tr><th scope="row">a range a..b</th><td rowspan="1" class="">BASE = a, HEAD = b</td><td rowspan="1" class="carry"></td></tr><tr><th scope="row">a single SHA</th><td rowspan="1" class="">HEAD = sha; root commit: stop, can&#x27;t be shown</td><td rowspan="1" class="">BASE = sha^</td></tr><tr><th scope="row">two things to compare</th><td rowspan="1" class="">HEAD = second</td><td rowspan="1" class="">BASE = merge-base first, second</td></tr></table></div>
+<p><small>Blank shaded cell: that stream carries on unchanged.</small></p>
+</body></html>

@@ -1,0 +1,21 @@
+// Contracts the viewer relies on, step 1 of PR #5 (2ddcce6)
+// The server side is unchanged at this step; what changes is that the viewer
+// now depends on /api/status, and treats a wrong answer as "server gone".
+// Hand-written from bin/pr-timeline.mjs and viewer/app.js at 2ddcce6.
+
+ GET /api/events          // text/event-stream
+   → "retry: 3000", then ":ping" every 25 s
+   // while any tab holds it open, the server's idle reaper won't fire
+
+ GET /api/status
+   → { app: 'pr-timeline', pid: number, branch: string }
++  // viewer: now probed on tab refocus, on network return, every 5 min while
++  // visible, after a failed file load, and on the retry button.
++  // app !== 'pr-timeline'  → "a stranger took the port" → disconnected
++  // any request bumps the server's lastActivity, so a probe keeps it alive
+
+ GET /api/timeline        → { repo, branch, base, baseShort, style, commits[] }
+ GET /api/file?sha&path&oldPath&status → { before, after, binary, deleted, added }
+
++// Not a type in the code: the state the banner now shows
++// type Connection = "up" | "down"      // #conn-banner hidden / visible

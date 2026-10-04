@@ -1,0 +1,27 @@
+# Component tree, step 1 of PR #5 (2ddcce6)
+# "surface backend disconnects and re-establish the viewer heartbeat"
+#
+# The viewer has no framework, so the "components" are the page's regions in
+# viewer/index.html, each with the viewer/app.js functions that own it.
+# Hand-written from the commit. Only regions that matter here are expanded.
+
+ <body>  (viewer/index.html)
+   module state: state{frames, frameIdx, changes, changeIdx, navToken, ...}
++  module state: liveness (EventSource on /api/events, or null)
+   <div#topbar>                          bindKeys, syncBarButtons
+     buttons: sidebar, fold, split, wrap, keys
+     <span#topbar-branch>                init
+   <div#scrim>
++  <div#conn-banner hidden role=status>  showDisconnected(down)
++    <span#conn-dot>
++    <span#conn-msg>  "Viewer server disconnected ... Relaunch the replay, then retry."
++    <button#conn-retry>                 click: verifyConnection(), then loadFrame(current) if alive
+   <main#main>
+     <nav#rail>                          renderRailCommits, toggleRail
+     <div#editor-wrap>
+       <div#editor>                      setupMonaco, loadFrame
++                                        loadFrame: a failed fetch also calls verifyConnection()
+       <div#placeholder>                 showPlaceholder
+   <div#topcard>                         renderChrome, applyCard
+   <div#timeline-pill>
+     <div#scrubber>                      renderScrubber, updateScrubber, bindScrubberDrag

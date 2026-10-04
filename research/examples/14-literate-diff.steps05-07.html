@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Literate diff, steps 5–7</title>
+<style>
+:root { --bg:#fbfaf7; --ink:#1d1d1b; --dim:#6b6b66; --line:#dddad2; --code:#f3f1ec; --add:#2d7a46; --addbg:#e6f4ea; --del:#b4372f; --delbg:#fbe9e7; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#17181a; --ink:#e8e6e1; --dim:#9a9890; --line:#34353a; --code:#202124; --add:#6fcf8f; --addbg:#173322; --del:#ff7b72; --delbg:#3a1d1b; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:17px/1.65 Georgia, "Iowan Old Style", serif; }
+main { max-width: 700px; margin: 0 auto; padding: 28px 16px 64px; }
+h1 { font: 600 26px/1.25 system-ui, sans-serif; margin: 0 0 6px; }
+h2 { font: 600 18px/1.3 system-ui, sans-serif; margin: 36px 0 6px; }
+.meta { font: 13px/1.5 system-ui, sans-serif; color: var(--dim); margin-bottom: 22px; }
+.sha { font: 12px ui-monospace, Menlo, monospace; color: var(--dim); }
+pre { background: var(--code); border: 1px solid var(--line); border-radius: 8px; padding: 10px 0; overflow-x: auto; font: 13px/1.5 ui-monospace, Menlo, monospace; white-space: pre; }
+pre span { display: block; padding: 0 12px; }
+pre .a { background: var(--addbg); color: var(--add); } pre .d { background: var(--delbg); color: var(--del); }
+code { font: 14px ui-monospace, Menlo, monospace; background: var(--code); padding: 1px 4px; border-radius: 4px; }
+.aside { font: 14px/1.55 system-ui, sans-serif; color: var(--dim); border-left: 3px solid var(--line); padding-left: 12px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Making the view skill tell the truth about ranges</h1>
+<div class="meta">PR #5, steps 5–7 · fa718bf, ba53054, ef00662 · skills/view/SKILL.md · a "literate diff" in Geoffrey Litt's sense: the changes as prose, in the order that explains them. Hand-written from the commits.</div>
+
+<p>By step 4 the view skill could turn almost anything into a range. These three steps fix the places where it would hand the viewer the wrong range, or a range with nothing in it. They read best in the order <em>the PR case, the empty check, the root commit</em>: each one is about a range that comes up empty or can't be shown.</p>
+
+<h2>A merged PR should still have its commits <span class="sha">step 5 · fa718bf</span></h2>
+<p>The skill took a PR's base as its merge-base with today's base branch. That works for an open PR. Once a PR is merged with a merge commit, though, its head is already inside the base branch, so the merge-base <em>is</em> the head, and the range is empty. PR #4 resolved to zero commits.</p>
+<p>GitHub already knows the base as the PR saw it: <code>baseRefOid</code>. Merge-basing against that gives PR #4 its 7 commits, and for an open PR it is the same answer as before.</p>
+<pre><span class="d">-  gh pr view &lt;n&gt; --json headRefName,baseRefName,title</span><span class="d">-  git fetch origin "pull/&lt;n&gt;/head:refs/pr-timeline/&lt;n&gt;" "&lt;baseRefName&gt;"</span><span class="a">+  gh pr view &lt;n&gt; --json baseRefOid,title</span><span class="a">+  git fetch origin "+pull/&lt;n&gt;/head:refs/pr-timeline/&lt;n&gt;" &lt;baseRefOid&gt;</span></pre>
+<p>Two smaller things ride along. Fetching the SHA directly still works after the base branch is deleted. And the leading <code>+</code> on the head fetch lets a re-fetch follow a force-push; without it git refuses a non-fast-forward update, which made the old line "re-fetching is safe" untrue.</p>
+<pre><span class="d">-  HEAD = `refs/pr-timeline/&lt;n&gt;`, BASE = `git merge-base origin/&lt;baseRefName&gt; refs/pr-timeline/&lt;n&gt;`.</span><span class="a">+  HEAD = `refs/pr-timeline/&lt;n&gt;`, BASE = `git merge-base &lt;baseRefOid&gt; refs/pr-timeline/&lt;n&gt;`.</span></pre>
+
+<h2>Count the range the way the viewer does <span class="sha">step 7 · ef00662</span></h2>
+<p>The skill already said "if there is nothing to step through, report that instead of starting a server", but gave no command. The obvious one, a plain <code>rev-list --count</code>, counts merges. Since step 2 the viewer skips merges, so a range of only merges would pass the check and then open on a blank viewer.</p>
+<pre><span class="d">-If HEAD has no commits over BASE, there is nothing to step through — report that</span><span class="d">-instead of starting a server.</span><span class="a">+Then count what the viewer will step through. It skips merges, so count the same</span><span class="a">+way:</span><span class="a">+</span><span class="a">+```</span><span class="a">+git -C &lt;REPO&gt; rev-list --count --no-merges &lt;BASE&gt;..&lt;HEAD&gt;</span><span class="a">+```</span><span class="a">+</span><span class="a">+If that is 0, there is nothing to step through — report that instead of</span><span class="a">+starting a server. A branch already merged into the default branch lands here.</span></pre>
+<p class="aside">The commit names two real branches that resolve to 0 in this repo, <code>viewer-disconnect</code> and <code>split-diff-toggle</code>, both already merged.</p>
+
+<h2>A root commit can't be shown <span class="sha">step 6 · ba53054</span></h2>
+<p>For a single SHA the base is its parent. For a root commit, which has no parent, the skill suggested the empty tree. That fails twice: the skill's own verify step rejects it (a tree is not a commit), and the server diffs every commit against its parent, so even launched by hand the root commit arrives with no files. Fixing that means changing the server, which is outside this branch, so the skill now just says so.</p>
+<pre><span class="d">-- **A single SHA** — HEAD = the SHA, BASE = `&lt;sha&gt;^`. For a root commit, BASE =</span><span class="d">-  `git hash-object -t tree /dev/null` (the empty tree).</span><span class="a">+- **A single SHA** — HEAD = the SHA, BASE = `&lt;sha&gt;^`. A root commit has no</span><span class="a">+  parent and can't be shown (see below).</span></pre>
+<p>and, next to the note about merges:</p>
+<pre><span class="a">+- **A root commit can't be shown.** Each step diffs a commit against its</span><span class="a">+  parent, and a root commit has none.</span></pre>
+</main>
+</body>
+</html>

@@ -1,0 +1,11 @@
+# Pseudocode diff, step 5 of PR #5 (fa718bf)
+# "Resolve a PR's base from the PR, and follow force-pushes"
+
+ resolve(PR n)
+   HEAD = the PR head, fetched to refs/pr-timeline/n
+-  BASE = merge-base(today's base branch, HEAD)
+-        // a merged PR's head is already in today's base → BASE = HEAD → empty range
++  BASE = merge-base(the base commit the PR saw, HEAD)
++        // a merged PR keeps its commits; works after the base branch is deleted
+-  re-fetch is "safe"
++  re-fetch follows a force-push (the fetch is forced with +)

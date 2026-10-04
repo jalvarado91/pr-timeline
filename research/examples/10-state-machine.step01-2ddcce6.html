@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Viewer connection prototype</title>
+<style>
+:root { --bg:#fbfaf7; --panel:#ffffff; --ink:#1d1d1b; --dim:#6b6b66; --line:#dddad2; --accent:#2f5bd3; --bad:#b4372f; --good:#2d7a46; --chip:#f1efe9; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#17181a; --panel:#1f2023; --ink:#e8e6e1; --dim:#9a9890; --line:#34353a; --accent:#7f9dff; --bad:#ff7b72; --good:#6fcf8f; --chip:#2a2b2f; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; }
+main { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 22px; margin: 0 0 6px; }
+h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin: 28px 0 10px; }
+p { margin: 0 0 10px; }
+.dim { color: var(--dim); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.field b { display:block; font-size: 12px; color: var(--dim); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.field span { font-size: 16px; }
+.changed { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.banner { margin-top: 12px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--bad); color: var(--bad); display: none; }
+.banner.show { display: block; }
+.ok { color: var(--good); } .bad { color: var(--bad); }
+button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.next { border-color: var(--accent); color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+.buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.tabs button[aria-selected="true"] { background: var(--chip); border-color: var(--ink); }
+ol.steps { padding-left: 20px; } ol.steps li { margin: 6px 0; }
+ol.steps li.done { color: var(--dim); text-decoration: line-through; }
+#log { font: 13px/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; max-height: 220px; overflow: auto; }
+</style>
+</head>
+<body>
+<main>
+<h1>Does the viewer notice when its server is gone?</h1>
+<p>A prototype of PR #5, step 1 (2ddcce6, "surface backend disconnects and re-establish the viewer heartbeat"). It models what <code>viewer/app.js</code> and the server do at that commit. Press the buttons and watch the state. Time moves in 5-minute steps, the interval of the viewer's probe.</p>
+<p class="dim">Hand-written in the shape of Dillon Mulroy's prototype skill (logic branch): a pure model, a state panel, free-play buttons, and guided walkthroughs. Simplified: the server's 15-minute idle limit is checked here once per 5-minute step.</p>
+
+<h2>Current state</h2>
+<div class="panel">
+  <div class="grid" id="state"></div>
+  <div class="banner" id="banner">Viewer server disconnected — it may have retired while idle. Relaunch the replay, then retry.</div>
+</div>
+
+<h2>Free play</h2>
+<div class="buttons" id="free"></div>
+
+<h2>Guided walkthroughs</h2>
+<div class="panel">
+  <div class="tabs" id="tabs" role="tablist"></div>
+  <p id="scenario-desc"></p>
+  <ol class="steps" id="scenario-steps"></ol>
+</div>
+
+<h2>What just happened</h2>
+<div class="panel"><div id="log"></div></div>
+</main>
+
+<script>
+// ---- The model: pure, no DOM. Mirrors viewer/app.js and bin/pr-timeline.mjs at 2ddcce6. ----
+const IDLE_LIMIT = 15;                  // minutes: server exits when no tab holds /api/events and no request came in
+
+function initial() {
+  return {
+    minute: 0,
+    server: 'running',                  // 'running' | 'retired' | 'stranger' (another program on the port)
+    heartbeat: 'open',                  // what the tab's EventSource says: 'open' | 'reconnecting'
+    serverSeesTab: true,                // does the server count this tab's heartbeat?
+    idleMinutes: 0,                     // minutes since the server last got any request
+    tabVisible: true,
+    online: true,
+    banner: false,                      // #conn-banner visible
+    stepLoaded: true,                   // is the current step's diff on screen
+  };
+}
+
+const reachable = s => s.online && s.server === 'running';
+
+// verifyConnection(): GET /api/status. Any request resets the server's idle clock.
+function probe(s, why, log) {
+  if (s.online && s.server === 'running') s.idleMinutes = 0;
+  if (reachable(s)) {
+    s.banner = false;
+    log.push(`${why}: GET /api/status → app is pr-timeline → banner hidden`);
+    // The code re-opens the heartbeat only if it is CLOSED (readyState 2). A half-open
+    // heartbeat still reads as open, so it is left alone.
+    return true;
+  }
+  s.banner = true;
+  log.push(`${why}: GET /api/status → ${!s.online ? 'network down' : s.server === 'stranger' ? 'answered, but not pr-timeline' : 'no answer'} → banner shown`);
+  return false;
+}
+
+function serverClock(s, log) {
+  if (s.server !== 'running') return;
+  if (!s.serverSeesTab && s.idleMinutes >= IDLE_LIMIT) {
+    s.server = 'retired';
+    s.heartbeat = 'reconnecting';
+    log.push(`server: no tab holds /api/events and nothing for ${IDLE_LIMIT} min → server exits`);
+  }
+}
+
+const actions = {
+  wait5(s, log) {
+    s.minute += 5;
+    if (s.server === 'running' && !(s.online)) { /* requests can't arrive */ }
+    s.idleMinutes += 5;
+    log.push(`5 minutes pass (now t+${s.minute} min)`);
+    if (s.tabVisible) probe(s, 'viewer: 5-minute timer, tab visible', log);
+    else log.push('viewer: tab hidden, so the timer skips the probe');
+    serverClock(s, log);
+  },
+  silentDrop(s, log) {
+    s.serverSeesTab = false;
+    log.push('heartbeat goes half-open: the server drops it, the tab still thinks it is open (no error fires)');
+  },
+  visibleDrop(s, log) {
+    s.serverSeesTab = false;
+    s.heartbeat = 'reconnecting';
+    log.push('heartbeat errors; EventSource retries on its own (retry: 3000)');
+    if (reachable(s)) {
+      s.heartbeat = 'open'; s.serverSeesTab = true; s.idleMinutes = 0; s.banner = false;
+      log.push('reconnected within 4 s → onopen → banner stays hidden');
+    } else {
+      log.push('still not open after 4 s → verifyConnection');
+      probe(s, 'viewer: heartbeat error check', log);
+    }
+  },
+  hideTab(s, log) { s.tabVisible = false; log.push('tab goes to the background'); },
+  showTab(s, log) {
+    s.tabVisible = true; log.push('tab visible again → visibilitychange');
+    probe(s, 'viewer: refocus', log);
+  },
+  netDown(s, log) {
+    s.online = false; s.serverSeesTab = false; s.heartbeat = 'reconnecting';
+    log.push('network drops; the heartbeat drops with it');
+  },
+  netUp(s, log) {
+    s.online = true; log.push('network back → online event');
+    if (s.server === 'running') { s.heartbeat = 'open'; s.serverSeesTab = true; log.push('EventSource reconnects → onopen'); }
+    probe(s, 'viewer: online', log);
+  },
+  nextStep(s, log) {
+    if (reachable(s)) { s.idleMinutes = 0; s.stepLoaded = true; log.push('press →: GET /api/file → next step shows'); }
+    else { s.stepLoaded = false; log.push("press →: GET /api/file fails → \"couldn't load\" placeholder"); probe(s, 'viewer: failed load', log); }
+  },
+  relaunch(s, log) {
+    s.server = 'running'; s.idleMinutes = 0;
+    log.push('agent relaunches the viewer on the same port');
+    if (s.online && s.heartbeat === 'reconnecting') {
+      s.heartbeat = 'open'; s.serverSeesTab = true; s.banner = false;
+      log.push('the retrying EventSource reconnects → onopen → banner hidden' + (s.stepLoaded ? '' : " (the step that failed still says couldn't load)"));
+    }
+  },
+  retry(s, log) {
+    log.push('press retry');
+    if (probe(s, 'viewer: retry', log)) { s.stepLoaded = true; log.push('alive → loadFrame(current) → the step shows again'); }
+  },
+  stranger(s, log) {
+    s.server = 'stranger'; s.serverSeesTab = false; s.heartbeat = 'reconnecting';
+    log.push('the server is gone and another program now listens on its port');
+  },
+};
+
+function dispatch(state, name) {
+  const s = structuredClone(state), log = [];
+  actions[name](s, log);
+  return { state: s, log };
+}
+
+// ---- The page: a thin shell over the model. ----
+const LABELS = {
+  wait5: 'Wait 5 minutes', silentDrop: 'Heartbeat silently dies', visibleDrop: 'Heartbeat errors',
+  hideTab: 'Hide the tab', showTab: 'Show the tab', netDown: 'Network drops', netUp: 'Network returns',
+  nextStep: 'Press → (next step)', relaunch: 'Relaunch the viewer', retry: 'Press retry on the banner',
+  stranger: 'Another program takes the port',
+};
+const FIELDS = [
+  ['minute', 'Time', s => `t+${s.minute} min`],
+  ['server', 'Server', s => s.server === 'running' ? '<span class="ok">running</span>' : s.server === 'retired' ? '<span class="bad">exited</span>' : '<span class="bad">other program on port</span>'],
+  ['heartbeat', 'Tab thinks heartbeat is', s => s.heartbeat],
+  ['serverSeesTab', 'Server counts this tab', s => s.serverSeesTab ? 'yes' : '<span class="bad">no</span>'],
+  ['idleMinutes', 'Server idle for', s => s.server === 'running' ? `${s.idleMinutes} of ${IDLE_LIMIT} min` + (s.serverSeesTab ? ' (held open by tab)' : '') : '—'],
+  ['tabVisible', 'Tab', s => s.tabVisible ? 'visible' : 'hidden'],
+  ['online', 'Network', s => s.online ? 'up' : '<span class="bad">down</span>'],
+  ['stepLoaded', 'Current step', s => s.stepLoaded ? 'on screen' : '<span class="bad">couldn\'t load</span>'],
+];
+
+const SCENARIOS = [
+  { name: 'Long read, visible tab',
+    desc: 'The reader stays on one step for 20 minutes. Early on, the heartbeat goes half-open, which used to let the server exit at 15 minutes. Watch the 5-minute probe keep it alive.',
+    steps: ['silentDrop', 'wait5', 'wait5', 'wait5', 'wait5', 'nextStep'] },
+  { name: 'Long read, background tab',
+    desc: 'Same, but the tab sits in the background, so nothing probes. The server exits; coming back shows the banner and the next press fails. Relaunching clears the banner on its own, because the heartbeat reconnects.',
+    steps: ['hideTab', 'silentDrop', 'wait5', 'wait5', 'wait5', 'showTab', 'nextStep', 'relaunch', 'nextStep'] },
+  { name: 'Network blip',
+    desc: 'The network drops for a moment. A press while offline fails and raises the banner; the network returning clears it, and the next press loads.',
+    steps: ['netDown', 'nextStep', 'netUp', 'nextStep'] },
+  { name: 'Someone else on the port',
+    desc: 'The server is gone and another program answers on its port. /api/status answers, but not as pr-timeline, so the viewer still says disconnected.',
+    steps: ['stranger', 'wait5', 'retry'] },
+];
+
+let state = initial(), prev = state, logLines = ['Start: tab open, heartbeat open, server running.'];
+let tab = 0, pos = 0;
+
+function render() {
+  document.getElementById('state').innerHTML = FIELDS.map(([k, label, fmt]) =>
+    `<div class="field ${prev[k] !== state[k] ? 'changed' : ''}"><b>${label}</b><span>${fmt(state)}</span></div>`).join('');
+  document.getElementById('banner').classList.toggle('show', state.banner);
+  document.getElementById('log').textContent = logLines.join('\n');
+  const sc = SCENARIOS[tab];
+  document.getElementById('tabs').innerHTML = SCENARIOS.map((x, i) =>
+    `<button role="tab" aria-selected="${i === tab}" data-tab="${i}">${x.name}</button>`).join('');
+  document.getElementById('scenario-desc').textContent = sc.desc;
+  document.getElementById('scenario-steps').innerHTML = sc.steps.map((a, i) =>
+    `<li class="${i < pos ? 'done' : ''}"><button ${i === pos ? 'class="next"' : 'disabled'} data-step="${i}">${LABELS[a]}</button></li>`).join('');
+}
+
+function run(name) {
+  const r = dispatch(state, name);
+  prev = state; state = r.state; logLines = r.log;
+  render();
+}
+
+document.getElementById('free').innerHTML = Object.keys(LABELS).map(a => `<button data-act="${a}">${LABELS[a]}</button>`).join('')
+  + '<button data-act="reset">Reset</button>';
+document.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.act === 'reset') { state = prev = initial(); logLines = ['Reset.']; pos = 0; return render(); }
+  if (b.dataset.act) return run(b.dataset.act);
+  if (b.dataset.tab) { tab = +b.dataset.tab; pos = 0; state = prev = initial(); logLines = ['Walkthrough reset to the start.']; return render(); }
+  if (b.dataset.step) { run(SCENARIOS[tab].steps[+b.dataset.step]); pos++; render(); }
+});
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+# Call-tree diff, step 7 of PR #5 (ef00662)
+# "Give the empty-range check a command that matches the viewer"
+# Hand-written from skills/view/SKILL.md.
+
+ /pr-timeline:view <target>
+   resolve HEAD, BASE
+   git rev-parse --verify (both ends)
+-  (no commits over BASE? no command given)
++  git rev-list --count --no-merges <BASE>..<HEAD>
++    0 → report, don't start a server
+   serve --daemon

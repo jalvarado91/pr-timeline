@@ -1,0 +1,10 @@
+# Call-tree diff, step 6 of PR #5 (ba53054) "Say the viewer can't show a root commit"
+# Hand-written from skills/view/SKILL.md.
+
+ /pr-timeline:view <sha>
+   resolve HEAD, BASE
+     HEAD = <sha>, BASE = <sha>^
+-    root commit: git hash-object -t tree /dev/null   (BASE = the empty tree)
++    root commit: stop, it can't be shown
+   git rev-parse --verify (both ends)
+   serve --daemon

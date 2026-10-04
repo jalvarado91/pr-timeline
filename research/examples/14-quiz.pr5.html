@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR 5 quiz</title>
+<style>
+:root { --bg:#fbfaf7; --panel:#fff; --ink:#1d1d1b; --dim:#6b6b66; --line:#dddad2; --good:#2d7a46; --goodbg:#e6f4ea; --bad:#b4372f; --badbg:#fbe9e7; --accent:#2f5bd3; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#17181a; --panel:#1f2023; --ink:#e8e6e1; --dim:#9a9890; --line:#34353a; --good:#6fcf8f; --goodbg:#173322; --bad:#ff7b72; --badbg:#3a1d1b; --accent:#7f9dff; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 system-ui, -apple-system, Segoe UI, sans-serif; }
+main { max-width: 720px; margin: 0 auto; padding: 24px 16px 56px; }
+h1 { font-size: 22px; margin: 0 0 4px; } .dim { color: var(--dim); }
+code { font: 14px ui-monospace, Menlo, monospace; }
+.q { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 16px 0; }
+.q h2 { font-size: 16px; margin: 0 0 4px; } .q .src { font-size: 12px; color: var(--dim); margin-bottom: 10px; }
+.q button { display: block; width: 100%; text-align: left; font: inherit; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; margin: 6px 0; cursor: pointer; }
+.q button:hover { border-color: var(--accent); }
+.q button.right { border-color: var(--good); background: var(--goodbg); }
+.q button.wrong { border-color: var(--bad); background: var(--badbg); }
+.fb { margin-top: 8px; font-size: 15px; } .fb.right { color: var(--good); } .fb.wrong { color: var(--bad); }
+#score { font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+<h1>Do you understand PR #5?</h1>
+<p class="dim">Five questions on 99feee1..da9a69c, in the shape of Geoffrey Litt's explain-diff quiz: medium difficulty, no gotchas. Litt's rule is to not send (or approve) code until you can pass. Hand-written from the commits. Score: <span id="score">0 / 5</span></p>
+<div id="quiz"></div>
+</main>
+<script>
+const QUIZ = [
+  { q: 'PR #4 was merged with a merge commit. Before step 5, why did viewing it show zero commits?',
+    src: 'step 5 · fa718bf',
+    options: [
+      ['Its head was already an ancestor of today\'s main, so merge-base(main, head) was the head itself.', true, 'Right. The range BASE..HEAD was head..head. Using baseRefOid, the base the PR saw, gives back its 7 commits.'],
+      ['The fetch lacked a +, so the PR head could not be fetched.', false, 'The missing + only bites on a re-fetch after a force-push. A first fetch works.'],
+      ['The viewer skips merge commits, and PR #4 was only a merge commit.', false, 'The PR had 7 ordinary commits; the problem was the base, not the merge skipping.'],
+      ['gh pr view does not return a base for merged PRs.', false, 'It does: baseRefOid is exactly what step 5 starts using.'],
+    ] },
+  { q: 'A range holds only merge commits. Before step 7, what would happen?',
+    src: 'steps 2 and 7 · 83a4743, ef00662',
+    options: [
+      ['The skill reports "nothing to step through" and doesn\'t start a server.', false, 'Only if the agent counted without merges, and step 7 is where that command first appears.'],
+      ['A plain count sees the merges, the check passes, and the viewer opens with nothing to show.', true, 'Right. Since step 2 the viewer drops merges, so the count must too: rev-list --count --no-merges.'],
+      ['The server refuses to start because loadTimeline throws.', false, 'loadTimeline returns an empty list; the viewer is what reports "no commits".'],
+      ['The viewer shows each merge as a step with no files.', false, 'That was the bug step 2 removed: merges are no longer steps at all.'],
+    ] },
+  { q: 'Why can\'t the viewer show a root commit, even launched by hand with the empty tree as base?',
+    src: 'step 6 · ba53054',
+    options: [
+      ['The server diffs each commit against its parent, so a root commit arrives with no files.', true, 'Right. And the skill\'s own verify step also rejects the empty tree, since it is a tree, not a commit.'],
+      ['git log cannot list a root commit.', false, 'It can; the problem is the per-commit diff against a parent that doesn\'t exist.'],
+      ['Monaco cannot render a file with no previous version.', false, 'Added files render fine; the issue is upstream, in which files the step has.'],
+      ['Root commits are always merge commits.', false, 'A root commit has no parents at all.'],
+    ] },
+  { q: 'A reader leaves the viewer open in a visible tab for 40 minutes, and the heartbeat goes half-open early on. After step 1, why doesn\'t the server exit?',
+    src: 'step 1 · 2ddcce6',
+    options: [
+      ['The viewer re-opens the heartbeat every 5 minutes.', false, 'It re-opens it only when it reads CLOSED. A half-open heartbeat still reads as open.'],
+      ['Every 5 minutes the visible tab requests /api/status, and any request resets the server\'s idle clock.', true, 'Right. The probe keeps the server alive even though the heartbeat itself is dead.'],
+      ['The server\'s :ping keeps the connection alive.', false, 'The ping goes out, but a half-open connection means the server no longer counts the tab.'],
+      ['The idle limit was raised from 15 minutes.', false, 'It is still 15 minutes; nothing on the server changed in step 1.'],
+    ] },
+  { q: 'After step 1, /api/status answers but with a different app name. What does the viewer do?',
+    src: 'step 1 · 2ddcce6',
+    options: [
+      ['Treats the server as alive and reloads the step.', false, 'verifyConnection checks app === "pr-timeline" first.'],
+      ['Shows the disconnected banner: another program has the port.', true, 'Right. The code\'s comment: "a stranger took the port".'],
+      ['Takes the port over, the way a new pr-timeline instance would.', false, 'Port takeover is the server\'s job at startup, not the viewer\'s.'],
+      ['Ignores it until the next 5-minute probe.', false, 'It raises the banner on that answer.'],
+    ] },
+];
+
+let score = 0;
+const quiz = document.getElementById('quiz');
+QUIZ.forEach((item, qi) => {
+  const el = document.createElement('section');
+  el.className = 'q';
+  el.innerHTML = `<h2>${qi + 1}. ${item.q}</h2><div class="src">${item.src}</div>` +
+    item.options.map((o, oi) => `<button data-q="${qi}" data-o="${oi}">${o[0]}</button>`).join('') +
+    `<div class="fb" id="fb${qi}"></div>`;
+  quiz.appendChild(el);
+});
+quiz.addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  const qi = +b.dataset.q, oi = +b.dataset.o, item = QUIZ[qi], [, ok, why] = item.options[oi];
+  const box = b.parentElement;
+  if (box.dataset.done) return;
+  b.classList.add(ok ? 'right' : 'wrong');
+  const fb = document.getElementById('fb' + qi);
+  fb.className = 'fb ' + (ok ? 'right' : 'wrong');
+  fb.textContent = why;
+  if (ok) { box.dataset.done = '1'; if (!box.dataset.missed) score++; document.getElementById('score').textContent = `${score} / ${QUIZ.length}`; }
+  else box.dataset.missed = '1';
+});
+</script>
+</body>
+</html>

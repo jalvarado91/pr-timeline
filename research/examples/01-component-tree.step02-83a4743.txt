@@ -1,0 +1,8 @@
+# Component tree, step 2 of PR #5 (83a4743) "Skip merge commits in the timeline"
+#
+# No change to the viewer's tree at this step. The change is on the server:
+# /api/timeline stops returning merge commits, so the rail and the scrubber
+# simply get fewer entries. See 02-call-tree.step02-83a4743.txt.
+#
+# Shown as a fixture on purpose: a per-step view should say "nothing here
+# changed" rather than disappear.

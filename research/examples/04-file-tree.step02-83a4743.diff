@@ -1,0 +1,6 @@
+# File-tree diff, step 2 of PR #5 (83a4743) "Skip merge commits in the timeline"
+
+ bin/
+~└── pr-timeline.mjs        # loadTimeline: git log --no-merges   (+6 -1)
+ test/
+~└── timeline.test.mjs      # + test: loadTimeline skips merge commits   (+22)

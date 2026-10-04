@@ -1,0 +1,21 @@
+# File-tree diff, all of PR #5 (99feee1..da9a69c)
+# One line of responsibility per entry. `~` = modified (the marker from
+# HumanLayer's "Why Software Factories Fail"); `+` added; `-` removed.
+# Hand-written from `git diff --stat 99feee1 da9a69c` and the commits.
+
+ pr-timeline/
+~├── .claude-plugin/{plugin,marketplace}.json   # description now leads with the viewer   (+1 -1 each)
+~├── package.json                              # same description change                  (+1 -1)
+~├── README.md                                 # leads with viewing any range; CLI takes <rev>   (+25 -17)
+ ├── bin/
+~│   └── pr-timeline.mjs                       # server: timeline skips merges; help says "range"  (+9 -7)
+ ├── skills/
+~│   ├── atomize/SKILL.md                      # says it writes a branch; hands off to view   (+7 -3)
+-│   ├── replay/SKILL.md                       # launched the viewer for replay/* only        (-50)
++│   └── view/SKILL.md                         # NEW: any PR, branch, SHA, range → BASE..HEAD  (+117)
+ ├── test/
+~│   └── timeline.test.mjs                     # + loadTimeline skips merge commits           (+22)
+ └── viewer/
+~    ├── app.js                                # heartbeat re-opened; probes /api/status       (+56 -6)
+~    ├── index.html                            # + disconnected banner                         (+6)
+~    └── style.css                             # banner styles                                 (+48)

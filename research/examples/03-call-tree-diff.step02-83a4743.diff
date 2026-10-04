@@ -1,0 +1,14 @@
+# Call-tree diff, step 2 of PR #5 (83a4743) "Skip merge commits in the timeline"
+# Hand-written from bin/pr-timeline.mjs and the test file.
+# The calls don't change; one call's arguments do, and a test caller appears.
+
+ GET /api/timeline
+   loadTimeline
+-    git log --reverse <base>..<branch>
++    git log --reverse --no-merges <base>..<branch>
+     extractStyle
+     per commit: git diff-tree --name-status, --numstat
+
++test('loadTimeline skips merge commits')
++  fixture
++  loadTimeline(repo, mergeBase, 'feature')

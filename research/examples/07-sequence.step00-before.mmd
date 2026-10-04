@@ -1,0 +1,14 @@
+%% Sequence: how the viewer keeps its server alive, BEFORE PR #5 step 1
+%% (viewer/app.js at 2ddcce6^). Hand-written.
+sequenceDiagram
+    participant Tab as Viewer tab
+    participant Srv as pr-timeline server
+    Tab->>Srv: GET /api/events (EventSource)
+    Srv-->>Tab: retry: 3000, then :ping every 25 s
+    Note over Tab,Srv: while this is open, the idle reaper won't fire
+    Note over Tab: tab backgrounded, device sleeps, or network blip
+    Srv--xTab: connection drops or goes half-open
+    Note over Srv: 15 min with no tab and no requests → exit
+    Tab->>Srv: next press: GET /api/file
+    Srv--xTab: no answer
+    Note over Tab: nothing on screen says why

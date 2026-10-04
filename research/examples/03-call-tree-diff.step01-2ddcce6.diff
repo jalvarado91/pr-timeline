@@ -1,0 +1,27 @@
+# Call-tree diff, step 1 of PR #5 (2ddcce6)
+# "surface backend disconnects and re-establish the viewer heartbeat"
+# Hand-written from viewer/app.js (not computed with calldiff).
+
+ init
+   keepServerAlive
+-    new EventSource('/api/events')
++    openLiveness
++      liveness?.close()
++      new EventSource('/api/events')
++        onopen  → showDisconnected(false)
++        onerror → after 4s, if still not open → verifyConnection
++    on visibilitychange (tab visible) → verifyConnection
++    on online                         → verifyConnection
++    every 5 min while visible         → verifyConnection
++    on #conn-retry click              → verifyConnection, then loadFrame(current) if alive
+   fetch('/api/timeline')
+   ...
+   loadFrame
+     fetchFile
++    on failure → verifyConnection
+
++verifyConnection
++  fetch('/api/status')
++    ok and app === 'pr-timeline' → showDisconnected(false)
++                                  → openLiveness, if the heartbeat is closed
++    anything else                 → showDisconnected(true)

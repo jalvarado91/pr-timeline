@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR 5 explainer</title>
+<style>
+:root { --bg:#fbfaf7; --panel:#fff; --ink:#1d1d1b; --dim:#6b6b66; --line:#cfcbc2; --add:#2d7a46; --addbg:#e9f5ec; --del:#b4372f; --delbg:#fbecea; --accent:#2f5bd3; --accbg:#eef2fd; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#17181a; --panel:#1f2023; --ink:#e8e6e1; --dim:#9a9890; --line:#3a3b40; --add:#6fcf8f; --addbg:#1b2e22; --del:#ff7b72; --delbg:#3a1f1d; --accent:#7f9dff; --accbg:#1f2740; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 system-ui, -apple-system, Segoe UI, sans-serif; }
+main { max-width: 900px; margin: 0 auto; padding: 24px 16px 56px; }
+h1 { font-size: 24px; margin: 0 0 4px; } h2 { font-size: 18px; margin: 36px 0 8px; }
+p { margin: 0 0 10px; } .dim { color: var(--dim); } code, .mono { font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+.lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 640px) { .lanes { grid-template-columns: 1fr; } }
+.lane { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--panel); }
+.lane h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); }
+.box { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 0 0 6px; background: var(--panel); }
+.box .t { font-weight: 600; font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+.box .s { color: var(--dim); font-size: 13px; }
+.box.add { border-color: var(--add); background: var(--addbg); }
+.box.del { border-color: var(--del); background: var(--delbg); text-decoration: line-through; text-decoration-color: var(--del); }
+.arrow { text-align: center; color: var(--dim); font-size: 13px; margin: -2px 0 4px; }
+.branches { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; margin-bottom: 6px; }
+.key { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--dim); margin: 6px 0 14px; }
+.key span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; border: 1px solid var(--line); }
+.key .k-add::before { background: var(--addbg); border-color: var(--add); } .key .k-del::before { background: var(--delbg); border-color: var(--del); }
+.seq { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel); }
+.seq .hd { padding: 8px 10px; font-weight: 600; border-bottom: 1px solid var(--line); font-size: 13px; }
+.seq .row { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px dashed var(--line); }
+.seq .row:last-child { border-bottom: 0; }
+.seq .msg { grid-column: 1 / -1; padding: 7px 10px; font-size: 13px; }
+.seq .msg.r { text-align: right; } .seq .msg.new { background: var(--addbg); } .seq .msg.bad { background: var(--delbg); }
+.callout { border-left: 3px solid var(--accent); background: var(--accbg); padding: 10px 12px; border-radius: 0 8px 8px 0; margin: 14px 0; }
+</style>
+</head>
+<body>
+<main>
+<h1>PR #5: view any range, and notice a dead server</h1>
+<p class="dim">99feee1..da9a69c · 13 steps · an HTML explainer in the shape HumanLayer's show-me skill asks for ("boxes and lines, code snippets"). Hand-written from the commits.</p>
+
+<p>This PR does two separate things. The <b>view skill</b> replaces the replay skill: any target an agent is handed becomes a <code>BASE..HEAD</code> range. The <b>viewer</b> learns to tell when its server has gone, instead of quietly ignoring presses.</p>
+
+<h2>1 · How a target becomes a range</h2>
+<div class="key"><span class="k-add">added in this PR</span><span class="k-del">removed in this PR</span></div>
+<div class="lanes">
+  <div class="lane">
+    <h3>Before: skills/replay</h3>
+    <div class="box"><div class="t">/pr-timeline:replay [name]</div><div class="s">only replay/* branches</div></div>
+    <div class="arrow">↓</div>
+    <div class="box"><div class="t">newest replay/* branch</div><div class="s">git for-each-ref refs/heads/replay/</div></div>
+    <div class="arrow">↓</div>
+    <div class="box"><div class="t">serve --daemon</div><div class="s">base auto-detected unless passed</div></div>
+  </div>
+  <div class="lane">
+    <h3>After: skills/view</h3>
+    <div class="box add"><div class="t">/pr-timeline:view &lt;target&gt;</div></div>
+    <div class="arrow">↓ by kind of target</div>
+    <div class="branches">
+      <div class="box add"><div class="t">nothing</div><div class="s">current branch</div></div>
+      <div class="box add"><div class="t">branch</div><div class="s">or origin/branch</div></div>
+      <div class="box add"><div class="t">PR n</div><div class="s">base = PR's baseRefOid</div></div>
+      <div class="box add"><div class="t">a..b</div><div class="s">as written</div></div>
+      <div class="box add"><div class="t">sha</div><div class="s">sha^..sha; not a root</div></div>
+      <div class="box add"><div class="t">path</div><div class="s">what's checked out</div></div>
+    </div>
+    <div class="arrow">↓</div>
+    <div class="box add"><div class="t">rev-list --count --no-merges</div><div class="s">0 → say so, don't serve</div></div>
+    <div class="arrow">↓</div>
+    <div class="box"><div class="t">serve --daemon --open</div><div class="s">always with --branch and --base</div></div>
+  </div>
+</div>
+<div class="callout">Why the PR base changed (step 5): once PR #4 was merged, its head was already inside <code>main</code>, so <code>merge-base(main, head)</code> was the head itself and the range came up empty. The base the PR saw, <code>baseRefOid</code>, gives PR #4 its 7 commits.</div>
+
+<h2>2 · How the viewer keeps its server alive</h2>
+<p>The server exits 15 minutes after the last tab lets go of <code>/api/events</code>. Browsers can drop that connection silently, so a reader on one step could lose the server mid-read.</p>
+<div class="seq">
+  <div class="hd">Viewer tab</div><div class="hd" style="text-align:right">Server</div>
+  <div class="row"><div class="msg">GET /api/events → held open, :ping every 25 s</div></div>
+  <div class="row"><div class="msg bad">heartbeat dropped or half-open → server stops counting the tab</div></div>
+  <div class="row"><div class="msg new">every 5 min while visible, on refocus, on network return: GET /api/status →</div></div>
+  <div class="row"><div class="msg r new">← { app: "pr-timeline", pid, branch } · resets the idle clock</div></div>
+  <div class="row"><div class="msg new">no answer, or another app → show "Viewer server disconnected" + retry</div></div>
+</div>
+<p class="dim" style="margin-top:8px">Green rows are new in step 1 (2ddcce6). The server side is unchanged; any request already reset its idle clock.</p>
+
+<h2>3 · What else changed</h2>
+<ul>
+  <li>Merge commits are no longer steps (step 2, 83a4743): <code>git log --no-merges</code>, with a test.</li>
+  <li>Wording says "range", not "replay", in the CLI help, startup line and viewer (step 11).</li>
+  <li>The skill points an empty merged branch at its PR (step 12), and a merge SHA at the commits it merged (step 13).</li>
+</ul>
+</main>
+</body>
+</html>

@@ -1,0 +1,22 @@
+%% Sequence: how the viewer keeps its server alive, AFTER PR #5 step 1
+%% (2ddcce6, viewer/app.js). Hand-written.
+sequenceDiagram
+    participant Tab as Viewer tab
+    participant Srv as pr-timeline server
+    Tab->>Srv: GET /api/events (openLiveness)
+    Srv-->>Tab: retry: 3000, then :ping every 25 s
+    loop every 5 min while visible, on refocus, on network return
+        Tab->>Srv: GET /api/status (verifyConnection)
+        Srv-->>Tab: { app: 'pr-timeline', pid, branch }
+        Note over Srv: any request resets lastActivity
+        opt heartbeat closed
+            Tab->>Srv: GET /api/events (re-open)
+        end
+    end
+    Note over Srv: server retired (idle, or --exit-after)
+    Tab->>Srv: GET /api/status
+    Srv--xTab: no answer
+    Note over Tab: show #conn-banner "Viewer server disconnected"
+    Tab->>Srv: retry click → GET /api/status (after relaunch)
+    Srv-->>Tab: { app: 'pr-timeline', ... }
+    Note over Tab: hide banner, reload the current step

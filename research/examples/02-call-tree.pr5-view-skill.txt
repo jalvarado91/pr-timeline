@@ -1,0 +1,31 @@
+# Call tree: what an agent runs for "/pr-timeline:view <target>"
+# At the end of PR #5 (da9a69c). Hand-written from skills/view/SKILL.md and
+# bin/pr-timeline.mjs. The skill is a prompt, so its "calls" are the commands
+# it tells the agent to run; below `serve` they are real function calls.
+
+/pr-timeline:view <target>
+  → resolve REPO                       (a worktree path → git -C <path>)
+  → resolve HEAD, BASE by target kind
+      nothing     → git symbolic-ref --short refs/remotes/origin/HEAD
+                    → git merge-base HEAD <default>
+      branch      → git merge-base <branch> <default>   (or origin/<branch>)
+      PR <n>      → gh pr view <n> --json baseRefOid,title
+                    → git fetch origin +pull/<n>/head:refs/pr-timeline/<n> <baseRefOid>
+                    → git merge-base <baseRefOid> refs/pr-timeline/<n>
+      a..b        → (as written)
+      <sha>       → BASE = <sha>^       (root commit: can't be shown)
+      two things  → git merge-base <first> <second>
+  → git rev-parse --verify --quiet "<ref>^{commit}"     (both ends)
+  → git rev-list --count --no-merges <BASE>..<HEAD>
+      0 → report, stop   (merged through a PR → offer the PR instead)
+  → npm install --prefix ${CLAUDE_PLUGIN_ROOT}           (first run only)
+  → node bin/pr-timeline.mjs serve --repo --branch --base --port 4820 --daemon --open
+      → main
+        → resolveBranch, resolveBase
+        → daemonize
+          → spawn detached: pr-timeline.mjs serve ... (no --daemon)
+              → main → takeoverPort → probeStatus, SIGTERM the old one
+                     → startServer
+          → probeStatus until the child answers
+          → openBrowser
+  → report the URL and the keys

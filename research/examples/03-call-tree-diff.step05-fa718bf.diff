@@ -1,0 +1,15 @@
+# Call-tree diff, step 5 of PR #5 (fa718bf)
+# "Resolve a PR's base from the PR, and follow force-pushes"
+# The tree is what the view skill tells the agent to run (see
+# 02-call-tree.pr5-view-skill.txt). Hand-written from skills/view/SKILL.md.
+
+ /pr-timeline:view <PR n>
+   resolve HEAD, BASE
+-    gh pr view <n> --json headRefName,baseRefName,title
+-    git fetch origin pull/<n>/head:refs/pr-timeline/<n> <baseRefName>
+-    git merge-base origin/<baseRefName> refs/pr-timeline/<n>
++    gh pr view <n> --json baseRefOid,title
++    git fetch origin +pull/<n>/head:refs/pr-timeline/<n> <baseRefOid>
++    git merge-base <baseRefOid> refs/pr-timeline/<n>
+   git rev-parse --verify (both ends)
+   serve --daemon

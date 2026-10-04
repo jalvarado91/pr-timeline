@@ -1,0 +1,14 @@
+%% State: the viewer's connection, PR #5 step 1 (2ddcce6, viewer/app.js).
+%% Hand-written. "Checking" is not a named state in the code: it is the time
+%% between a trigger and verifyConnection's answer.
+stateDiagram-v2
+    [*] --> Connected: openLiveness, EventSource opens
+    Connected --> Waiting: EventSource error
+    Waiting --> Connected: reconnects within 4 s
+    Waiting --> Checking: still not open after 4 s
+    Connected --> Checking: tab visible again / online / 5-min timer / a file load fails
+    Checking --> Connected: /api/status answers app = pr-timeline (re-open heartbeat if closed)
+    Checking --> Disconnected: no answer, error, or another app on the port
+    Disconnected --> Checking: retry click, refocus, online, timer
+    Disconnected --> Connected: EventSource onopen
+    note right of Disconnected: #conn-banner visible

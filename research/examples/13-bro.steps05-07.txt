@@ -1,0 +1,16 @@
+# Entry 13: plain-language restate (Dillon Mulroy's /bro), steps 5–7 of PR #5
+# Not a picture. It does translate, as one plain sentence per step: the commit
+# message restated "like one human talking to another". Hand-written.
+
+step 5  fa718bf  Resolve a PR's base from the PR, and follow force-pushes
+  Viewing a PR that was already merged showed nothing. Now it uses the base the
+  PR itself started from, so you see its commits, and re-fetching works after
+  someone force-pushes.
+
+step 6  ba53054  Say the viewer can't show a root commit
+  The skill told agents a trick for a repo's very first commit that doesn't
+  work. Now it just says the first commit can't be shown.
+
+step 7  ef00662  Give the empty-range check a command that matches the viewer
+  The skill said "don't open an empty range" but not how to check. Now it gives
+  the exact count to run, one that skips merges the way the viewer does.
