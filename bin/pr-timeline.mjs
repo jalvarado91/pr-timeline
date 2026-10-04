@@ -12,6 +12,7 @@ import path from 'node:path';
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const VIEWER_DIR = path.join(ROOT, 'viewer');
 const REPS_DIR = '.pr-timeline/reps/';
+const isRep = (p) => p?.startsWith(REPS_DIR);
 const MONACO_DIR = path.join(ROOT, 'node_modules', 'monaco-editor', 'min', 'vs');
 
 function usage(code = 0) {
@@ -149,24 +150,28 @@ function loadTimeline(repo, base, branch) {
       const s = stats.get(f.path) ?? { additions: 0, deletions: 0, binary: false };
       Object.assign(f, s);
     }
-    // Representations ride along under .pr-timeline/reps/: list the ones that
-    // stand at this step (added since base, so reps merged into base don't
-    // leak in), mark the ones this commit touched, and keep them all out of
+    // Representations ride along under .pr-timeline/reps/; keep them out of
     // the code diff.
-    const isRep = (p) => p?.startsWith(REPS_DIR);
-    const touched = new Set(files.filter((f) => isRep(f.path)).map((f) => f.path));
     commit.files = files.filter((f) => !isRep(f.path));
     for (const f of commit.files) {
       if (isRep(f.oldPath)) { f.status = 'A'; delete f.oldPath; }   // moved out of reps: new code
     }
-    commit.reps = gitText(repo, [
-      'diff', '--name-only', '--diff-filter=d', '-z', base, commit.sha, '--', REPS_DIR,
-    ]).split('\0').filter(Boolean)
-      .map((p) => ({ path: p, name: p.slice(REPS_DIR.length), changed: touched.has(p) }));
   }
-  // A commit that only touched reps has no code to step through; its reps
-  // still show at the next step, since they're read cumulatively from base.
-  return { commits: commits.filter((c) => c.files.length), style };
+  // A commit that only touched reps has no code to step through, so it is no
+  // step. Each step lists the reps that stand at it (added since base, so reps
+  // merged into base don't leak in) and marks the ones that changed since the
+  // previous step, so a rep-only commit's edit lands on the next step.
+  const steps = commits.filter((c) => c.files.length);
+  const repsChanged = (from, to) => gitText(repo, [
+    'diff', '--name-only', '--diff-filter=d', '-z', from, to, '--', REPS_DIR,
+  ]).split('\0').filter(Boolean);
+  steps.forEach((commit, i) => {
+    commit.repsSince = i ? steps[i - 1].sha : base;
+    const changed = new Set(repsChanged(commit.repsSince, commit.sha));
+    commit.reps = repsChanged(base, commit.sha)
+      .map((p) => ({ path: p, name: p.slice(REPS_DIR.length), changed: changed.has(p) }));
+  });
+  return { commits: steps, style };
 }
 
 // Pull a trailing `Narrative-Style: <id>` line off a commit body, mutating the
@@ -378,7 +383,10 @@ function startServer(args, branch, base) {
           return sendJSON(res, { error: 'bad request' }, 400);
         }
         const after = status === 'D' ? null : showFile(args.repo, sha, filePath);
-        const before = status === 'A' ? null : showFile(args.repo, `${sha}^`, oldPath);
+        // reps diff against the previous step, which may not be the parent
+        const since = url.searchParams.get('since');
+        if (since && !/^[0-9a-f]{4,40}$/.test(since)) return sendJSON(res, { error: 'bad request' }, 400);
+        const before = status === 'A' ? null : showFile(args.repo, since ?? `${sha}^`, oldPath);
         sendJSON(res, {
           before: before?.content ?? '',
           after: after?.content ?? '',

@@ -109,7 +109,10 @@ test('loadTimeline lists reps per step and keeps them out of files', () => {
   const [withRep, codeOnly] = commits;
   assert.deepEqual(withRep.files.map((f) => f.path), ['c.js']);
   assert.deepEqual(withRep.reps, [{ path: '.pr-timeline/reps/x.mmd', name: 'x.mmd', changed: true }]);
-  assert.deepEqual(codeOnly.reps, [{ path: '.pr-timeline/reps/x.mmd', name: 'x.mmd', changed: false }]);
+  // the rep-only edit lands on the next step, measured from the previous step
+  assert.deepEqual(codeOnly.reps, [{ path: '.pr-timeline/reps/x.mmd', name: 'x.mmd', changed: true }]);
+  assert.equal(codeOnly.repsSince, withRep.sha);
+  assert.equal(withRep.repsSince, repBase);
 
   const { commits: plain } = loadTimeline(repo, base, 'main~4');
   assert.ok(plain.every((c) => c.reps.length === 0), 'a rep-less range lists no reps');

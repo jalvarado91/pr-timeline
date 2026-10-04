@@ -414,6 +414,7 @@ async function fetchFile(fr) {
     status: fr.file.status,
   });
   if (fr.file.oldPath) params.set('oldPath', fr.file.oldPath);
+  if (fr.file.since) params.set('since', fr.file.since);
   const res = await fetch(`/api/file?${params}`);
   if (!res.ok) throw new Error(`file fetch failed: ${res.status}`);
   const payload = await res.json();
@@ -524,7 +525,7 @@ async function renderReps() {
 
   let payload;
   try {
-    payload = await fetchFile({ commit, file: { path: rep.path, status: rep.changed ? 'M' : 'A' } });
+    payload = await fetchFile({ commit, file: { path: rep.path, status: rep.changed ? 'M' : 'A', since: commit.repsSince } });
   } catch (err) {
     verifyConnection();
     payload = { after: `couldn't load ${rep.name}: ${err.message ?? err}`, before: '', failed: true };
