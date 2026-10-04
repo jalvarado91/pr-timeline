@@ -114,6 +114,14 @@ test('loadTimeline lists reps per step and keeps them out of files', () => {
   assert.equal(codeOnly.repsSince, withRep.sha);
   assert.equal(withRep.repsSince, repBase);
 
+  // asked for, a rep-only commit is a view step of its own
+  const { commits: withViews } = loadTimeline(repo, repBase, 'main', { viewSteps: true });
+  assert.deepEqual(withViews.map((c) => c.subject), ['code plus rep', 'rep only', 'code only']);
+  assert.equal(withViews[1].viewOnly, true);
+  assert.deepEqual(withViews[1].files, []);
+  assert.equal(withViews[1].reps[0].changed, true);
+  assert.equal(withViews[2].reps[0].changed, false, 'the view step already showed it');
+
   const { commits: plain } = loadTimeline(repo, base, 'main~4');
   assert.ok(plain.every((c) => c.reps.length === 0), 'a rep-less range lists no reps');
 });

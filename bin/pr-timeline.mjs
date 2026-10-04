@@ -101,7 +101,7 @@ function fail(msg) {
   process.exit(1);
 }
 
-function loadTimeline(repo, base, branch) {
+function loadTimeline(repo, base, branch, { viewSteps = false } = {}) {
   // --no-merges: a merge has no single-parent diff, so it would be an empty
   // step you can't enter.
   const log = gitText(repo, [
@@ -153,15 +153,17 @@ function loadTimeline(repo, base, branch) {
     // Representations ride along under .pr-timeline/reps/; keep them out of
     // the code diff.
     commit.files = files.filter((f) => !isRep(f.path));
+    commit.viewOnly = !commit.files.length && files.length > 0;
     for (const f of commit.files) {
       if (isRep(f.oldPath)) { f.status = 'A'; delete f.oldPath; }   // moved out of reps: new code
     }
   }
   // A commit that only touched reps has no code to step through, so it is no
-  // step. Each step lists the reps that stand at it (added since base, so reps
+  // step, unless the viewer asks for view steps (it then shows the view in
+  // place of the code). Each step lists the reps that stand at it (added since base, so reps
   // merged into base don't leak in) and marks the ones that changed since the
   // previous step, so a rep-only commit's edit lands on the next step.
-  const steps = commits.filter((c) => c.files.length);
+  const steps = commits.filter((c) => c.files.length || (viewSteps && c.viewOnly));
   const repsChanged = (from, to) => gitText(repo, [
     'diff', '--name-only', '--diff-filter=d', '-z', from, to, '--', REPS_DIR,
   ]).split('\0').filter(Boolean);
@@ -369,7 +371,9 @@ function startServer(args, branch, base) {
         res.on('close', () => { clearInterval(ping); sseClients.delete(res); lastActivity = Date.now(); });
         return;
       } else if (url.pathname === '/api/timeline') {
-        const { commits, style } = loadTimeline(args.repo, base, branch);
+        const { commits, style } = loadTimeline(args.repo, base, branch, {
+          viewSteps: url.searchParams.has('viewSteps'),
+        });
         sendJSON(res, {
           repo: path.basename(args.repo), branch, base,
           baseShort: base.slice(0, 7), style, commits,
