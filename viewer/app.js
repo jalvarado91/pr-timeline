@@ -557,7 +557,7 @@ async function renderReps() {
     payload = { after: `couldn't load ${rep.name}: ${err.message ?? err}`, before: '', failed: true };
   }
   if (body.dataset.key !== key) return;    // stepped on while loading
-  const lines = rep.changed && repsDelta
+  const lines = rep.changed && repsDelta && payload.before   // a new view: its dot says so
     ? lineDiff(payload.before, payload.after)
     : payload.after.replace(/\n$/, '').split('\n').map((l) => [' ', l]);
   const isDiff = rep.name.endsWith('.diff');
