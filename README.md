@@ -17,7 +17,8 @@ Two Claude Code skills:
 - **`/pr-timeline:atomize`** — studies a PR, commit, or ref range, plans a "how
   this was written" narrative, and materializes it as real commits on a
   `replay/<name>` branch, built in a throwaway worktree and verified
-  byte-identical to the source head. Then hands off to `view`.
+  byte-identical to the source head (apart from any `.pr-timeline/` views).
+  Then hands off to `view`.
 
 ## Narrative styles
 
@@ -34,7 +35,8 @@ Pick one by naming it in the invocation — `/pr-timeline:atomize 42 wishful-api
 prose ("atomize this top-down"). No style named → `foundations-first`. Not sure?
 Ask "what styles are there?" and atomize lists them.
 
-Only the final commit is guaranteed byte-identical to the source head — the
+Only the final commit is guaranteed byte-identical to the source head (apart
+from any `.pr-timeline/` views) — the
 intermediate commits are a narrative, not a CI-green history. Some styles (e.g.
 `wishful-api`) deliberately produce mid-replay trees that don't compile.
 

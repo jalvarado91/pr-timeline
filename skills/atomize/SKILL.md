@@ -9,8 +9,8 @@ Take one large diff and re-tell it as a sequence of small commits that reads lik
 the code being written. How the story is ordered is set by a *narrative style*
 (§3a) — by default `foundations-first`: definitions first, then logic, then
 integration, then tests. The result is a real branch named `replay/<name>` whose
-final tree is **byte-identical** to the source head. The user steps through it with
-`/pr-timeline:view`.
+final tree is **byte-identical** to the source head, apart from any views under
+`.pr-timeline/` (§4). The user steps through it with `/pr-timeline:view`.
 
 This skill **writes a branch**. Only run it when the user wants the diff re-told
 as a story. To just look at an existing diff, PR, or branch as it stands, use
