@@ -20,6 +20,8 @@ let splitView = store?.getItem('prtl-split') === '1';
 // wrap defaults to the form factor (on for phones) until the user toggles it
 const wrapStored = store?.getItem('prtl-wrap');
 let wrapLines = wrapStored == null ? isMobile() : wrapStored === '1';
+let repsOpen = store?.getItem('prtl-reps') !== '0';
+let repsDelta = store?.getItem('prtl-repsdelta') !== '0';
 
 const state = {
   timeline: null,
@@ -32,6 +34,7 @@ const state = {
   models: [],
   decorations: [],
   foldUnchanged: false,
+  repName: null,     // the view picked in the reps panel; kept across steps
 };
 
 let monacoApi = null;
@@ -125,6 +128,7 @@ async function init() {
   const styleEl = $('topbar-style');
   styleEl.textContent = state.timeline.style ?? '';
   styleEl.hidden = !state.timeline.style;
+  $('tb-reps').hidden = !state.timeline.commits.some((c) => c.reps.length);
 
   const start = parseHash() ?? { frame: 0, change: 0 };
   await loadFrame(start.frame, start.change);
@@ -240,6 +244,7 @@ function applyFold() {
 
 function applyWrap() {
   diffEditor.updateOptions({ wordWrap: wrapLines ? 'on' : 'off' });
+  $('reps-body').classList.toggle('wrap', wrapLines);
 }
 
 function applyCard() {
@@ -266,6 +271,7 @@ function syncBarButtons() {
   $('tb-fold').classList.toggle('active', state.foldUnchanged);
   $('tb-split').classList.toggle('active', splitView);
   $('tb-wrap').classList.toggle('active', wrapLines);
+  $('tb-reps').classList.toggle('active', !$('reps').hidden);
 }
 
 /* ---------------- navigation ---------------- */
@@ -478,6 +484,104 @@ function renderChrome() {
 
   renderRailFiles();
   updateScrubber();
+  renderReps();
+}
+
+/* ---------------- representations ----------------
+   Other views of the change (.pr-timeline/reps/<name> on the step's tree),
+   shown beside the code as they stand at the current commit. */
+
+async function renderReps() {
+  const { commit } = frame();
+  const reps = commit.reps;
+  const panel = $('reps');
+  panel.hidden = !repsOpen || !reps.length;
+  document.documentElement.classList.toggle('reps-open', !panel.hidden);
+  syncBarButtons();
+  if (panel.hidden) return;
+
+  const rep = reps.find((r) => r.name === state.repName)
+    ?? reps.find((r) => r.changed) ?? reps[0];
+  const body = $('reps-body');
+  const key = `${commit.sha}:${rep.path}:${repsDelta}`;
+  if (body.dataset.key === key) return;    // same view; steps within a commit share it
+  body.dataset.key = key;
+  const tabs = $('reps-tabs');
+  tabs.innerHTML = '';
+  for (const r of reps) {
+    const tab = document.createElement('button');
+    tab.className = 'rep-tab';
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-selected', String(r === rep));
+    tab.classList.toggle('changed', r.changed);
+    tab.textContent = r.name;
+    if (r.changed) tab.title = 'changed in this step';
+    tab.addEventListener('click', () => { state.repName = r.name; renderReps(); });
+    tabs.appendChild(tab);
+  }
+  $('reps-delta').hidden = !rep.changed;
+  $('reps-delta').classList.toggle('active', repsDelta);
+
+  let payload;
+  try {
+    payload = await fetchFile({ commit, file: { path: rep.path, status: rep.changed ? 'M' : 'A' } });
+  } catch (err) {
+    verifyConnection();
+    payload = { after: `couldn't load ${rep.name}: ${err.message ?? err}`, before: '' };
+  }
+  if (body.dataset.key !== key) return;    // stepped on while loading
+  const lines = rep.changed && repsDelta
+    ? lineDiff(payload.before, payload.after)
+    : payload.after.replace(/\n$/, '').split('\n').map((l) => [' ', l]);
+  const isDiff = rep.name.endsWith('.diff');
+  body.innerHTML = '';
+  let firstChange = null;
+  for (const [t, text] of lines) {
+    const line = document.createElement('div');
+    line.className = 'rl';
+    if (t !== ' ') line.classList.add(t === '+' ? 'rl-add' : 'rl-del');
+    if (isDiff && /^[+-]/.test(text)) line.classList.add(text[0] === '+' ? 'd-add' : 'd-del');
+    if (isDiff && text.startsWith('@@')) line.classList.add('d-hunk');
+    line.textContent = text || ' ';
+    if (t !== ' ' && !firstChange) firstChange = line;
+    body.appendChild(line);
+  }
+  body.scrollTop = 0;
+  firstChange?.scrollIntoView({ block: 'nearest' });
+}
+
+/* Line diff by longest common subsequence: views are short, so the
+   quadratic table is fine; past a size cap, show old then new. */
+function lineDiff(before, after) {
+  const a = before ? before.replace(/\n$/, '').split('\n') : [];
+  const b = after.replace(/\n$/, '').split('\n');
+  if (a.length * b.length > 4e6) return [...a.map((l) => ['-', l]), ...b.map((l) => ['+', l])];
+  const L = Array.from({ length: a.length + 1 }, () => new Uint32Array(b.length + 1));
+  for (let i = a.length - 1; i >= 0; i--) {
+    for (let j = b.length - 1; j >= 0; j--) {
+      L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    }
+  }
+  const out = [];
+  let i = 0, j = 0;
+  while (i < a.length || j < b.length) {
+    if (i < a.length && j < b.length && a[i] === b[j]) { out.push([' ', a[i]]); i++; j++; }
+    else if (j < b.length && (i === a.length || L[i][j + 1] >= L[i + 1][j])) out.push(['+', b[j++]]);
+    else out.push(['-', a[i++]]);
+  }
+  return out;
+}
+
+function toggleReps() {
+  repsOpen = !repsOpen;
+  store?.setItem('prtl-reps', repsOpen ? '1' : '0');
+  renderReps();
+}
+
+function toggleRepsDelta() {
+  repsDelta = !repsDelta;
+  store?.setItem('prtl-repsdelta', repsDelta ? '1' : '0');
+  renderReps();
 }
 
 function renderScrubber() {
@@ -652,6 +756,8 @@ function handleNavKey(e) {
     case 'x': toggleFold(); return true;
     case 's': toggleSplit(); return true;
     case 'w': toggleWrap(); return true;
+    case 'v': toggleReps(); return true;
+    case 'd': toggleRepsDelta(); return true;
     case 'c': cycleCorner(); return true;
     case 'm': toggleCardMin(); return true;
     case '?': $('help').hidden = false; return true;
@@ -702,6 +808,8 @@ function bindKeys() {
   $('tb-fold').addEventListener('click', toggleFold);
   $('tb-split').addEventListener('click', toggleSplit);
   $('tb-wrap').addEventListener('click', toggleWrap);
+  $('tb-reps').addEventListener('click', toggleReps);
+  $('reps-delta').addEventListener('click', toggleRepsDelta);
   $('tb-keys').addEventListener('click', () => { $('help').hidden = false; });
   document.querySelector('.dot-min').addEventListener('click', (e) => {
     e.stopPropagation();
