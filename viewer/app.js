@@ -39,10 +39,14 @@ const state = {
   decorations: [],
   foldUnchanged: false,
   repName: null,     // the view picked in the reps panel; kept across steps
+  repDiffed: false,  // the shown view has an earlier version to diff against
+  repSeq: 0,
 };
 
 let monacoApi = null;
 let diffEditor = null;
+let repsEditor = null;   // the views panel's own diff editor
+const editors = () => [diffEditor, repsEditor];
 
 require(['vs/editor/editor.main'], () => {
   monacoApi = window.monaco;
@@ -164,7 +168,7 @@ function setupMonaco() {
       'scrollbarSlider.hoverBackground': '#3d3d4488',
     },
   });
-  diffEditor = m.editor.createDiffEditor($('editor'), {
+  const options = {
     theme: 'replay-dark',
     automaticLayout: true,
     readOnly: true,
@@ -181,8 +185,10 @@ function setupMonaco() {
     renderLineHighlight: 'none',
     diffAlgorithm: 'advanced',
     hideUnchangedRegions: { enabled: false },
-  });
-  for (const ed of [diffEditor.getModifiedEditor(), diffEditor.getOriginalEditor()]) {
+  };
+  diffEditor = m.editor.createDiffEditor($('editor'), options);
+  repsEditor = m.editor.createDiffEditor($('reps-editor'), options);
+  for (const ed of editors().flatMap((d) => [d.getModifiedEditor(), d.getOriginalEditor()])) {
     ed.onKeyDown((e) => {
       if (handleNavKey(e.browserEvent)) {
         e.preventDefault();
@@ -205,7 +211,8 @@ function applyEditorMode() {
   // sidebar overlays on mobile and starts closed; on desktop it's docked open
   $('rail').classList.toggle('hidden', mobile);
   $('scrim').hidden = true;
-  diffEditor.updateOptions(editorModeOptions());
+  for (const d of editors()) d.updateOptions(editorModeOptions());
+  repsEditor.updateOptions({ renderSideBySide: splitView && state.repDiffed && !mobile });
   applyFold();
   applyWrap();
   syncBarButtons();
@@ -240,16 +247,13 @@ function editorModeOptions() {
 }
 
 function applyFold() {
-  diffEditor.updateOptions({
-    hideUnchangedRegions: {
-      enabled: state.foldUnchanged, revealLineCount: 8, contextLineCount: 4,
-    },
-  });
+  const fold = (enabled) => ({ hideUnchangedRegions: { enabled, revealLineCount: 8, contextLineCount: 4 } });
+  diffEditor.updateOptions(fold(state.foldUnchanged));
+  repsEditor.updateOptions(fold(state.foldUnchanged && state.repDiffed));   // folding a plain view hides it all
 }
 
 function applyWrap() {
-  diffEditor.updateOptions({ wordWrap: wrapLines ? 'on' : 'off' });
-  $('reps-body').classList.toggle('wrap', wrapLines);
+  for (const d of editors()) d.updateOptions({ wordWrap: wrapLines ? 'on' : 'off' });
 }
 
 function applyCard() {
@@ -436,7 +440,6 @@ async function fetchFile(fr) {
     status: fr.file.status,
   });
   if (fr.file.oldPath) params.set('oldPath', fr.file.oldPath);
-  if (fr.file.since) params.set('since', fr.file.since);
   const res = await fetch(`/api/file?${params}`);
   if (!res.ok) throw new Error(`file fetch failed: ${res.status}`);
   const payload = await res.json();
@@ -530,7 +533,7 @@ async function renderReps() {
   const rep = reps.find((r) => r.name === state.repName)
     ?? reps.find((r) => r.changed) ?? reps[0];
   const body = $('reps-body');
-  const key = `${commit.sha}:${rep.path}:${repsDelta}`;
+  const key = `${commit.sha.slice(0, 12)}:${rep.path}:${repsDelta}`;
   if (body.dataset.key === key) return;    // same view; steps within a commit share it
   body.dataset.key = key;
   const tabs = $('reps-tabs');
@@ -546,58 +549,55 @@ async function renderReps() {
     tab.addEventListener('click', () => { state.repName = r.name; renderReps(); });
     tabs.appendChild(tab);
   }
-  $('reps-delta').hidden = !rep.changed;
-  $('reps-delta').classList.toggle('active', repsDelta);
+  // what to diff against: the previous step (what this step changed in the
+  // view), or with d, the view's first version (the whole change so far)
+  const first = state.timeline.commits.find((c) => c.reps.some((r) => r.path === rep.path));
+  const delta = $('reps-delta');
+  delta.hidden = first.sha === commit.sha;
+  delta.textContent = repsDelta ? 'since last step' : 'since first';
+  const beforeSha = repsDelta ? (rep.changed ? commit.repsSince : null)
+    : (first.sha !== commit.sha ? first.sha : null);
 
-  let payload;
+  let after, before, failed = false;
   try {
-    payload = await fetchFile({ commit, file: { path: rep.path, status: rep.changed ? 'M' : 'A', since: commit.repsSince } });
+    [after, before] = await Promise.all([
+      viewAt(commit.sha, rep.path),
+      beforeSha ? viewAt(beforeSha, rep.path) : '',
+    ]);
   } catch (err) {
     verifyConnection();
-    payload = { after: `couldn't load ${rep.name}: ${err.message ?? err}`, before: '', failed: true };
+    [after, before, failed] = [`couldn't load ${rep.name}: ${err.message ?? err}`, '', true];
   }
   if (body.dataset.key !== key) return;    // stepped on while loading
-  const lines = rep.changed && repsDelta && payload.before   // a new view: its dot says so
-    ? lineDiff(payload.before, payload.after)
-    : payload.after.replace(/\n$/, '').split('\n').map((l) => [' ', l]);
-  const isDiff = rep.name.endsWith('.diff');
-  body.innerHTML = '';
-  let firstChange = null;
-  for (const [t, text] of lines) {
-    const line = document.createElement('div');
-    line.className = 'rl';
-    if (t !== ' ') line.classList.add(t === '+' ? 'rl-add' : 'rl-del');
-    if (isDiff && /^[+-]/.test(text)) line.classList.add(text[0] === '+' ? 'd-add' : 'd-del');
-    if (isDiff && text.startsWith('@@')) line.classList.add('d-hunk');
-    line.textContent = text || ' ';
-    if (t !== ' ' && !firstChange) firstChange = line;
-    body.appendChild(line);
+  if (failed) body.dataset.key = '';       // let retry load it again
+
+  // No earlier version: show the view plain, one pane, the same text both sides.
+  state.repDiffed = Boolean(before);
+  const m = monacoApi;
+  const seq = ++state.repSeq;              // fresh URIs: a model's URI can't be reused while it lives
+  const uri = (side) => m.Uri.from({ scheme: 'view', path: `/${seq}/${side}/${rep.name}` });
+  const old = repsEditor.getModel();
+  const original = m.editor.createModel(state.repDiffed ? before : after, undefined, uri('a'));
+  const modified = m.editor.createModel(after, undefined, uri('b'));
+  repsEditor.updateOptions({ renderSideBySide: splitView && state.repDiffed && !isMobile() });
+  applyFold();
+  repsEditor.setModel({ original, modified });
+  old?.original.dispose();
+  old?.modified.dispose();
+  const ed = repsEditor.getModifiedEditor();
+  ed.setScrollTop(0);
+  if (state.repDiffed) {                   // open on the first thing that changed
+    const sub = repsEditor.onDidUpdateDiff(() => {
+      sub.dispose();
+      const change = repsEditor.getLineChanges()?.[0];
+      if (change) ed.revealLineInCenterIfOutsideViewport(Math.max(1, change.modifiedStartLineNumber));
+    });
   }
-  body.scrollTop = 0;
-  firstChange?.scrollIntoView({ block: 'nearest' });
-  if (payload.failed) body.dataset.key = '';   // let retry load it again
 }
 
-/* Line diff by longest common subsequence: views are short, so the
-   quadratic table is fine; past a size cap, show old then new. */
-function lineDiff(before, after) {
-  const a = before ? before.replace(/\n$/, '').split('\n') : [];
-  const b = after.replace(/\n$/, '').split('\n');
-  if (a.length * b.length > 4e6) return [...a.map((l) => ['-', l]), ...b.map((l) => ['+', l])];
-  const L = Array.from({ length: a.length + 1 }, () => new Uint32Array(b.length + 1));
-  for (let i = a.length - 1; i >= 0; i--) {
-    for (let j = b.length - 1; j >= 0; j--) {
-      L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
-    }
-  }
-  const out = [];
-  let i = 0, j = 0;
-  while (i < a.length || j < b.length) {
-    if (i < a.length && j < b.length && a[i] === b[j]) { out.push([' ', a[i]]); i++; j++; }
-    else if (i < a.length && (j === b.length || L[i + 1][j] >= L[i][j + 1])) out.push(['-', a[i++]]);
-    else out.push(['+', b[j++]]);
-  }
-  return out;
+// A view's text at a commit ('' when it doesn't exist there).
+async function viewAt(sha, path) {
+  return (await fetchFile({ commit: { sha }, file: { path, status: 'A' } })).after;
 }
 
 // The view a view step is about: the one its commit changed.
@@ -892,6 +892,7 @@ function toggleSplit() {
   splitView = !splitView;
   store?.setItem('prtl-split', splitView ? '1' : '0');
   diffEditor.updateOptions({ renderSideBySide: splitView });
+  repsEditor.updateOptions({ renderSideBySide: splitView && state.repDiffed });
   syncBarButtons();
   revealCurrent();   // the modified editor is a new pane; re-anchor the playhead
 }

@@ -389,10 +389,7 @@ function startServer(args, branch, base) {
           return sendJSON(res, { error: 'bad request' }, 400);
         }
         const after = status === 'D' ? null : showFile(args.repo, sha, filePath);
-        // reps diff against the previous step, which may not be the parent
-        const since = url.searchParams.get('since');
-        if (since && !/^[0-9a-f]{4,40}$/.test(since)) return sendJSON(res, { error: 'bad request' }, 400);
-        const before = status === 'A' ? null : showFile(args.repo, since ?? `${sha}^`, oldPath);
+        const before = status === 'A' ? null : showFile(args.repo, `${sha}^`, oldPath);
         sendJSON(res, {
           before: before?.content ?? '',
           after: after?.content ?? '',

@@ -70,9 +70,9 @@
     <aside id="reps" hidden>
       <div id="reps-bar">
         <div id="reps-tabs" role="tablist"></div>
-        <button class="bar-btn" id="reps-delta" title="show what this step changed in the view (d)">changes</button>
+        <button class="bar-btn" id="reps-delta" title="diff against the last step or the view's first version (d)">since last step</button>
       </div>
-      <div id="reps-body" class="mono"></div>
+      <div id="reps-body"><div id="reps-editor"></div></div>
     </aside>
   </main>
 
@@ -117,7 +117,7 @@
         <dt>s</dt><dd>split / unified diff</dd>
         <dt>w</dt><dd>wrap long lines</dd>
         <dt>v</dt><dd>other views of this step</dd>
-        <dt>d</dt><dd>show what the step changed in a view</dd>
+        <dt>d</dt><dd>diff a view since the last step / its first version</dd>
         <dt>?</dt><dd>this help</dd>
       </dl>
     </div>
