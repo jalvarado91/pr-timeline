@@ -17,7 +17,8 @@ Two Claude Code skills:
 - **`/pr-timeline:atomize`** — studies a PR, commit, or ref range, plans a "how
   this was written" narrative, and materializes it as real commits on a
   `replay/<name>` branch, built in a throwaway worktree and verified
-  byte-identical to the source head. Then hands off to `view`.
+  byte-identical to the source head (apart from any `.pr-timeline/` views).
+  Then hands off to `view`.
 
 ## Narrative styles
 
@@ -34,7 +35,8 @@ Pick one by naming it in the invocation — `/pr-timeline:atomize 42 wishful-api
 prose ("atomize this top-down"). No style named → `foundations-first`. Not sure?
 Ask "what styles are there?" and atomize lists them.
 
-Only the final commit is guaranteed byte-identical to the source head — the
+Only the final commit is guaranteed byte-identical to the source head (apart
+from any `.pr-timeline/` views) — the
 intermediate commits are a narrative, not a CI-green history. Some styles (e.g.
 `wishful-api`) deliberately produce mid-replay trees that don't compile.
 
@@ -90,6 +92,11 @@ second commit subject
 - A sidebar with the commit list and the current commit's files (`t`, or the
   `sidebar` button) — it docks beside the editor, pushing it over.
 - `x` (or `fold`) folds unchanged regions when you want just the deltas.
+- `v` (or `views`) shows other views of the step next to the code, such as a
+  call tree or a component tree, when the replay carries them under
+  `.pr-timeline/reps/` (see the atomize skill). They render in the editor and
+  diff like code: a dot marks the views the step changed, and `d` switches
+  between what this step changed and the whole change so far.
 - Merge commits are skipped: a merge has no single-parent diff, so it would be
   a step you can't enter. A branch that merged `main` mid-flight shows the
   commits authored on it. Uncommitted work isn't shown at all — every step

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { loadTimeline, extractStyle } from '../bin/pr-timeline.mjs';
@@ -82,4 +82,51 @@ test('loadTimeline skips merge commits', () => {
   assert.ok(!commits.some((c) => c.subject.startsWith('Merge ')), 'no merge commits');
   assert.ok(commits.every((c) => c.files.length > 0), 'every step has files to show');
   assert.ok(commits.some((c) => c.subject === 'add feature'), 'branch work is kept');
+});
+
+// Representations under .pr-timeline/reps/ travel with the commits but never
+// show up as code; reps already on base don't leak into the range.
+test('loadTimeline lists reps per step and keeps them out of files', () => {
+  const { repo, base } = fixture();
+  const repsDir = path.join(repo, '.pr-timeline', 'reps');
+  mkdirSync(repsDir, { recursive: true });
+  writeFileSync(path.join(repsDir, 'old.txt'), 'on base already\n');
+  git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'rep on base');
+  const repBase = git(repo, 'rev-parse', 'HEAD').trim();
+
+  writeFileSync(path.join(repo, 'c.js'), 'call();\n');
+  writeFileSync(path.join(repsDir, 'x.mmd'), 'graph TD\n');
+  git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'code plus rep');
+
+  writeFileSync(path.join(repsDir, 'x.mmd'), 'graph TD\n  a --> b\n');
+  git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'rep only');
+
+  writeFileSync(path.join(repo, 'c.js'), 'call();\ncall();\n');
+  git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'code only');
+
+  const { commits } = loadTimeline(repo, repBase, 'main');
+  assert.deepEqual(commits.map((c) => c.subject), ['code plus rep', 'code only'], 'a rep-only commit is no step');
+  const [withRep, codeOnly] = commits;
+  assert.deepEqual(withRep.files.map((f) => f.path), ['c.js']);
+  assert.deepEqual(withRep.reps, [{ path: '.pr-timeline/reps/x.mmd', name: 'x.mmd', changed: true }]);
+  // the rep-only edit lands on the next step, measured from the previous step
+  assert.deepEqual(codeOnly.reps, [{ path: '.pr-timeline/reps/x.mmd', name: 'x.mmd', changed: true }]);
+  assert.equal(codeOnly.repsSince, withRep.sha);
+  assert.equal(withRep.repsSince, repBase);
+
+  // asked for, a rep-only commit is a view step of its own
+  const { commits: withViews } = loadTimeline(repo, repBase, 'main', { viewSteps: true });
+  assert.deepEqual(withViews.map((c) => c.subject), ['code plus rep', 'rep only', 'code only']);
+  assert.equal(withViews[1].viewOnly, true);
+  assert.deepEqual(withViews[1].files, []);
+  assert.equal(withViews[1].reps[0].changed, true);
+  assert.equal(withViews[2].reps[0].changed, false, 'the view step already showed it');
+
+  // a commit that only deletes a view has no view to show, so no step
+  git(repo, 'rm', '-q', '.pr-timeline/reps/x.mmd'); git(repo, 'commit', '-q', '-m', 'drop rep');
+  const { commits: afterDrop } = loadTimeline(repo, repBase, 'main', { viewSteps: true });
+  assert.ok(!afterDrop.some((c) => c.subject === 'drop rep'));
+
+  const { commits: plain } = loadTimeline(repo, base, 'main~5');
+  assert.ok(plain.every((c) => c.reps.length === 0), 'a rep-less range lists no reps');
 });

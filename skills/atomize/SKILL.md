@@ -9,8 +9,8 @@ Take one large diff and re-tell it as a sequence of small commits that reads lik
 the code being written. How the story is ordered is set by a *narrative style*
 (§3a) — by default `foundations-first`: definitions first, then logic, then
 integration, then tests. The result is a real branch named `replay/<name>` whose
-final tree is **byte-identical** to the source head. The user steps through it with
-`/pr-timeline:view`.
+final tree is **byte-identical** to the source head, apart from any views under
+`.pr-timeline/` (§4). The user steps through it with `/pr-timeline:view`.
 
 This skill **writes a branch**. Only run it when the user wants the diff re-told
 as a story. To just look at an existing diff, PR, or branch as it stands, use
@@ -163,6 +163,38 @@ Rules while editing intermediate states:
 - Deletions of replaced code get their own step near the end ("retire X") when
   meaningful, or ride along with the commit that replaces them.
 
+### Representations (optional)
+
+A step can also carry other views of the change, which the viewer shows next
+to the code: a call tree, a component tree, a file tree, types, pseudocode.
+Write each as one file under `.pr-timeline/reps/` in the step's tree
+(`call-tree.txt`, `admin-tree.txt`).
+
+- A view is a **snapshot**: the shape as it stands at that step, with no
+  `+`/`-` markers. git keeps its history, and the viewer diffs it like code,
+  against the previous step or its first version.
+- To show where things start, add a view as it is before the change, in a
+  commit of its own at the start. A commit that touches only views is a view
+  step: it shows the view in place of the code. Use one to show a shape just
+  before the code that makes it so.
+- Otherwise, edit a view in the same commit as the code that changes what it
+  shows. Leave it alone when the shape doesn't change.
+
+A reviewer steps through a view's changes one marked line at a time, so write
+it for that:
+
+- **One concept per line.** Every changed line should read on its own: write
+  `filter: low confidence only`, not a lone `lowConfOnly` appended to a list.
+- **Indent only for nesting.** Two spaces per level; no alignment padding or
+  wrapped continuations, which show up as stray marks.
+- **Name things on first use.** "the speech-to-text model (whisper)", not
+  "whisper" out of nowhere.
+- **Keep lines short**, about 34 characters, so they fit a phone unwrapped.
+- **Check it against the code** at that step: every name in the tree exists
+  there.
+- Reps belong on the replay branch only; `.pr-timeline/` paths never show in
+  the code diff.
+
 ## 5. Verify exactness, then hand off
 
 After the last step, still inside the worktree, diff the replay branch against
@@ -170,10 +202,11 @@ the **source SHA** (not `HEAD` — that is the replay branch itself, so it would
 always be empty):
 
 ```
-git diff --stat replay/<name> $SRC_SHA
+git diff --stat replay/<name> $SRC_SHA -- . ':!.pr-timeline'
 ```
 
-This **must be empty**. If it isn't, sync the remainder — `git checkout $SRC_SHA -- .`
+This **must be empty** (reps are the one thing the replay adds). If it isn't,
+sync the remainder — `git checkout $SRC_SHA -- .`
 — and either amend it into the final commit (if it belongs there) or add one
 more terse commit. Re-run the check. Never leave the branch differing from
 `$SRC_SHA`.

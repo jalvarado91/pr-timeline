@@ -11,6 +11,8 @@ import path from 'node:path';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const VIEWER_DIR = path.join(ROOT, 'viewer');
+const REPS_DIR = '.pr-timeline/reps/';
+const isRep = (p) => p?.startsWith(REPS_DIR);
 const MONACO_DIR = path.join(ROOT, 'node_modules', 'monaco-editor', 'min', 'vs');
 
 function usage(code = 0) {
@@ -99,7 +101,7 @@ function fail(msg) {
   process.exit(1);
 }
 
-function loadTimeline(repo, base, branch) {
+function loadTimeline(repo, base, branch, { viewSteps = false } = {}) {
   // --no-merges: a merge has no single-parent diff, so it would be an empty
   // step you can't enter.
   const log = gitText(repo, [
@@ -148,9 +150,32 @@ function loadTimeline(repo, base, branch) {
       const s = stats.get(f.path) ?? { additions: 0, deletions: 0, binary: false };
       Object.assign(f, s);
     }
-    commit.files = files;
+    // Representations ride along under .pr-timeline/reps/; keep them out of
+    // the code diff.
+    commit.files = files.filter((f) => !isRep(f.path));
+    // a view step needs a view to show: deleting the only one leaves nothing
+    commit.viewOnly = !commit.files.length && files.some((f) => f.status !== 'D');
+    for (const f of commit.files) {
+      if (isRep(f.oldPath)) { f.status = 'A'; delete f.oldPath; }   // moved out of reps: new code
+    }
   }
-  return { commits, style };
+  // A commit that only touched reps has no code to step through, so it is no
+  // step, unless the viewer asks for view steps (it then shows the view in
+  // place of the code). Each step lists the reps that stand at it (added
+  // since base, so reps merged into base don't leak in) and marks the ones
+  // that changed since the previous step, so a rep-only commit's edit lands
+  // on the next step.
+  const steps = commits.filter((c) => c.files.length || (viewSteps && c.viewOnly));
+  const repsChanged = (from, to) => gitText(repo, [
+    'diff', '--name-only', '--diff-filter=d', '-z', from, to, '--', REPS_DIR,
+  ]).split('\0').filter(Boolean);
+  steps.forEach((commit, i) => {
+    commit.repsSince = i ? steps[i - 1].sha : base;
+    const changed = new Set(repsChanged(commit.repsSince, commit.sha));
+    commit.reps = repsChanged(base, commit.sha)
+      .map((p) => ({ path: p, name: p.slice(REPS_DIR.length), changed: changed.has(p) }));
+  });
+  return { commits: steps, style };
 }
 
 // Pull a trailing `Narrative-Style: <id>` line off a commit body, mutating the
@@ -169,7 +194,7 @@ function extractStyle(commits) {
 
 function showFile(repo, ref, filePath) {
   try {
-    const buf = git(repo, ['show', `${ref}:${filePath}`]);
+    const buf = git(repo, ['show', `${ref}:${filePath}`], { stdio: ['ignore', 'pipe', 'ignore'] });   // a missing side is expected
     if (buf.subarray(0, 8000).includes(0)) return { binary: true };
     return { content: buf.toString('utf8') };
   } catch {
@@ -348,7 +373,9 @@ function startServer(args, branch, base) {
         res.on('close', () => { clearInterval(ping); sseClients.delete(res); lastActivity = Date.now(); });
         return;
       } else if (url.pathname === '/api/timeline') {
-        const { commits, style } = loadTimeline(args.repo, base, branch);
+        const { commits, style } = loadTimeline(args.repo, base, branch, {
+          viewSteps: url.searchParams.has('viewSteps'),
+        });
         sendJSON(res, {
           repo: path.basename(args.repo), branch, base,
           baseShort: base.slice(0, 7), style, commits,

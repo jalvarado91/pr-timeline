@@ -199,6 +199,60 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .wash-add { background: #1f341f66; }
 .wash-del { background: #3c202066; text-decoration: line-through; text-decoration-color: #e05f5f66; }
 
+/* ---- representations: other views of the step, beside the code ---- */
+
+#reps {
+  width: 40%;
+  max-width: 640px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--glass-edge);
+  background: var(--bg-editor);
+}
+/* keep the floating card over the code, not over the views */
+.reps-open:not(.mobile):not(.reps-full) #topcard.tc-tr,
+.reps-open:not(.mobile):not(.reps-full) #topcard.tc-br { right: calc(min(40%, 640px) + 12px); }
+
+/* a view step, or swapped: the view takes the code's place, full size */
+.reps-full #editor-wrap { display: none; }
+.reps-full #reps { flex: 1; width: auto; max-width: none; border-left: 0; }
+
+#reps-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--glass-edge);
+}
+#reps-tabs { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }   /* every changed dot stays in sight */
+.rep-tab {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--dim);
+  padding: 3px 9px;
+  border-radius: 7px;
+  white-space: nowrap;
+}
+.rep-tab:hover { color: var(--text); }
+.rep-tab[aria-selected="true"] { color: var(--text); background: rgba(255, 255, 255, 0.13); }
+.rep-tab.changed::after,
+#tb-reps.changed::after {          /* this step says something new in that view */
+  content: '';
+  display: inline-block;
+  width: 6px; height: 6px;
+  margin-left: 6px;
+  vertical-align: 1px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+#tb-reps { position: relative; }
+#tb-reps.changed::after { position: absolute; top: 2px; right: 2px; margin: 0; }   /* the step changed a view you aren't seeing */
+
+/* a view renders in its own Monaco editor, like the code */
+#reps-body { flex: 1; min-height: 0; position: relative; }
+#reps-editor { position: absolute; inset: 0; }
+
 /* ---- commit card: floating, corner-cycling, minimizable ---- */
 
 #topcard {
@@ -324,6 +378,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 }
 .tick.done { background: var(--accent-dim); }
 .tick.current { background: var(--accent); }
+.tick.view { border-radius: 50%; flex: 0 0 auto; width: 10px; align-self: center; height: 10px; background: transparent; box-shadow: inset 0 0 0 1.5px var(--faint); }
+.tick.view.done { box-shadow: inset 0 0 0 1.5px var(--accent-dim); }
+.tick.view.current { background: var(--accent); box-shadow: none; }
 .tick:hover { background: var(--dim); }
 .tick.current:hover { background: var(--accent); }
 
@@ -340,6 +397,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   flex-shrink: 0;
 }
 .nav-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.1); }
+.nav-btn.dead { opacity: 0.3; pointer-events: none; }   /* nothing further this way */
 
 /* ---- status bar ---- */
 
@@ -466,6 +524,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .mobile #topbar { height: 40px; gap: 4px; }
 .mobile #tb-split { display: none; }           /* unified only on a phone */
 .mobile #topbar-branch { display: none; }      /* room is scarce; branch lives elsewhere */
+.mobile #tb-keys { display: none; }            /* keyboard shortcuts are meaningless on touch */
 
 /* sidebar becomes an overlay drawer instead of pushing the editor */
 .mobile #rail {
@@ -535,6 +594,11 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* content-box: keep the 22px filmstrip look but pad the touch area to ~44px */
 .mobile #scrubber { box-sizing: content-box; height: 22px; padding: 11px 0; min-width: 0; }
 .mobile .seg { min-width: 6px; }
+
+/* views stack under the code, sharing the height; nothing covers either */
+.mobile #main { flex-direction: column; }
+.mobile #reps { width: auto; max-width: none; height: 45%; border-left: 0; border-top: 1px solid var(--glass-edge); }
+.mobile.reps-full #reps { height: auto; min-height: 0; border-top: 0; }
 
 .mobile #status .hint { display: none; }       /* keyboard hints are meaningless on touch */
 .mobile #conn-banner { top: calc(46px + env(safe-area-inset-top)); }

@@ -20,6 +20,15 @@ let splitView = store?.getItem('prtl-split') === '1';
 // wrap defaults to the form factor (on for phones) until the user toggles it
 const wrapStored = store?.getItem('prtl-wrap');
 let wrapLines = wrapStored == null ? isMobile() : wrapStored === '1';
+let repsOpen = store?.getItem('prtl-reps') !== '0';
+let repsDelta = store?.getItem('prtl-repsdelta') !== '0';
+// Where views show, from ?place= (comma-separated): beside the code (default),
+// as steps of their own (step), or swapped with the code at full size (swap).
+// With no ?place=, views get their own steps and sit beside the code on a
+// desktop, swapped with it on a phone.
+const places = new Set((new URLSearchParams(location.search).get('place')
+  ?? `step,${isMobile() ? 'swap' : 'beside'}`).split(','));
+let swapped = false;   // swap mode: the views are showing instead of the code
 
 const state = {
   timeline: null,
@@ -32,10 +41,19 @@ const state = {
   models: [],
   decorations: [],
   foldUnchanged: false,
+  repName: null,     // the view picked in the reps panel; kept across steps
+  repDiffed: false,  // the shown view has an earlier version to diff against
+  repSeq: 0,
+  viewChanges: [],   // the shown view's own line changes, walked like code's when it fills the screen
+  viewChangeIdx: 0,
+  viewAt: 0,         // where to land in the next view: its first change, or 'end'
+  viewDecorations: [],
 };
 
 let monacoApi = null;
 let diffEditor = null;
+let repsEditor = null;   // the views panel's own diff editor
+const editors = () => [diffEditor, repsEditor];
 
 require(['vs/editor/editor.main'], () => {
   monacoApi = window.monaco;
@@ -105,7 +123,7 @@ function keepServerAlive() {
 
 async function init() {
   keepServerAlive();
-  const res = await fetch('/api/timeline');
+  const res = await fetch(places.has('step') ? '/api/timeline?viewSteps' : '/api/timeline');
   if (!res.ok) throw new Error(`timeline failed: ${res.status}`);
   state.timeline = await res.json();
 
@@ -113,6 +131,7 @@ async function init() {
     commit.files.forEach((file, f) => {
       state.frames.push({ c, f, commit, file });
     });
+    if (commit.viewOnly) state.frames.push({ c, f: 0, commit, file: null });   // a view step
   });
   if (!state.frames.length) throw new Error('no commits to step through in this range');
 
@@ -125,6 +144,7 @@ async function init() {
   const styleEl = $('topbar-style');
   styleEl.textContent = state.timeline.style ?? '';
   styleEl.hidden = !state.timeline.style;
+  $('tb-reps').hidden = !state.timeline.commits.some((c) => c.reps.length);
 
   const start = parseHash() ?? { frame: 0, change: 0 };
   await loadFrame(start.frame, start.change);
@@ -155,7 +175,7 @@ function setupMonaco() {
       'scrollbarSlider.hoverBackground': '#3d3d4488',
     },
   });
-  diffEditor = m.editor.createDiffEditor($('editor'), {
+  const options = {
     theme: 'replay-dark',
     automaticLayout: true,
     readOnly: true,
@@ -172,8 +192,10 @@ function setupMonaco() {
     renderLineHighlight: 'none',
     diffAlgorithm: 'advanced',
     hideUnchangedRegions: { enabled: false },
-  });
-  for (const ed of [diffEditor.getModifiedEditor(), diffEditor.getOriginalEditor()]) {
+  };
+  diffEditor = m.editor.createDiffEditor($('editor'), options);
+  repsEditor = m.editor.createDiffEditor($('reps-editor'), options);
+  for (const ed of editors().flatMap((d) => [d.getModifiedEditor(), d.getOriginalEditor()])) {
     ed.onKeyDown((e) => {
       if (handleNavKey(e.browserEvent)) {
         e.preventDefault();
@@ -196,7 +218,8 @@ function applyEditorMode() {
   // sidebar overlays on mobile and starts closed; on desktop it's docked open
   $('rail').classList.toggle('hidden', mobile);
   $('scrim').hidden = true;
-  diffEditor.updateOptions(editorModeOptions());
+  for (const d of editors()) d.updateOptions(editorModeOptions());
+  repsEditor.updateOptions({ renderSideBySide: splitView && state.repDiffed && !mobile });
   applyFold();
   applyWrap();
   syncBarButtons();
@@ -231,15 +254,13 @@ function editorModeOptions() {
 }
 
 function applyFold() {
-  diffEditor.updateOptions({
-    hideUnchangedRegions: {
-      enabled: state.foldUnchanged, revealLineCount: 8, contextLineCount: 4,
-    },
-  });
+  const fold = (enabled) => ({ hideUnchangedRegions: { enabled, revealLineCount: 8, contextLineCount: 4 } });
+  diffEditor.updateOptions(fold(state.foldUnchanged));
+  repsEditor.updateOptions(fold(state.foldUnchanged && state.repDiffed));   // folding a plain view hides it all
 }
 
 function applyWrap() {
-  diffEditor.updateOptions({ wordWrap: wrapLines ? 'on' : 'off' });
+  for (const d of editors()) d.updateOptions({ wordWrap: wrapLines ? 'on' : 'off' });
 }
 
 function applyCard() {
@@ -266,14 +287,28 @@ function syncBarButtons() {
   $('tb-fold').classList.toggle('active', state.foldUnchanged);
   $('tb-split').classList.toggle('active', splitView);
   $('tb-wrap').classList.toggle('active', wrapLines);
+  $('tb-reps').classList.toggle('active', !$('reps').hidden);
 }
 
 /* ---------------- navigation ---------------- */
 
 function frame() { return state.frames[state.frameIdx]; }
 
+// While a view fills the code area, stepping walks the view's own changes,
+// then moves a commit on: the frames of one commit all show the same view.
+const viewFills = () => !frame().file || (places.has('swap') && swapped);
+
 async function next() {
-  if (state.changeIdx < state.changes.length - 1) {
+  if (viewFills()) {
+    const c = frame().c;
+    if (state.viewChangeIdx < state.viewChanges.length - 1) {
+      state.viewChangeIdx++;
+      revealView();
+    } else {
+      const to = stepCommit(c, 1);
+      if (to >= 0) await loadFrame(firstFrameOfCommit(to), 0);
+    }
+  } else if (state.changeIdx < state.changes.length - 1) {
     state.changeIdx++;
     revealCurrent();
   } else if (state.frameIdx < state.frames.length - 1) {
@@ -282,12 +317,32 @@ async function next() {
 }
 
 async function prev() {
-  if (state.changeIdx > 0) {
+  if (viewFills()) {
+    const c = frame().c;
+    if (state.viewChangeIdx > 0) {
+      state.viewChangeIdx--;
+      revealView();
+    } else {
+      const to = stepCommit(c, -1);
+      if (to >= 0) await loadFrame(firstFrameOfCommit(to), 'end');
+    }
+  } else if (state.changeIdx > 0) {
     state.changeIdx--;
     revealCurrent();
   } else if (state.frameIdx > 0) {
     await loadFrame(state.frameIdx - 1, 'end');
   }
+}
+
+// Swapped to the views, a step whose views didn't change has nothing to
+// show, so stepping skips it. Returns the commit to step to, or -1 at the end.
+const locked = () => places.has('swap') && swapped;
+function stepCommit(c, dir) {
+  const { commits } = state.timeline;
+  for (let i = c + dir; i >= 0 && i < commits.length; i += dir) {
+    if (!locked() || commits[i].reps.some((r) => r.changed)) return i;
+  }
+  return -1;
 }
 
 function firstFrameOfCommit(c) {
@@ -307,10 +362,23 @@ async function prevCommit() {
 
 async function loadFrame(idx, at) {
   const token = ++state.navToken;
+  const fromC = frame()?.c;
   state.frameIdx = Math.max(0, Math.min(idx, state.frames.length - 1));
+  state.viewAt = at === 'end' ? 'end' : 0;
   const fr = frame();
+  // Entering a step, follow the change: if the picked view didn't change
+  // here and another did, show that one. A tab picked within a step stays.
+  const changed = fr.commit.reps.find((r) => r.changed);
+  const picked = fr.commit.reps.find((r) => r.name === state.repName);
+  if (fr.c !== fromC && changed && !picked?.changed) state.repName = changed.name;
   renderChrome();
   $('change-label').textContent = '…';
+  if (!fr.file) {                             // a view step: the view stands in for the code
+    state.changes = [];
+    state.changeIdx = 0;
+    finishFrame();
+    return;
+  }
 
   let payload;
   try {
@@ -428,19 +496,50 @@ function showPlaceholder(text) {
 /* ---------------- reveal ---------------- */
 
 function revealCurrent() {
-  const change = state.changes[state.changeIdx];
-  const editor = diffEditor.getModifiedEditor();
+  if (viewFills()) return revealView();
   const n = state.changes.length;
   $('change-label').textContent = n ? `change ${state.changeIdx + 1}/${n}` : 'no text changes';
+  markEnds(false, false);
   updateScrubber();
   updateHash();
-  if (!change) return;
+  state.decorations = markChange(diffEditor, state.changes[state.changeIdx], state.decorations);
+}
 
+// The view's counterpart: the same playhead, in the view's editor, and when
+// the view fills the screen, its name and change count in the status bar.
+function revealView() {
+  const n = state.viewChanges.length;
+  if (viewFills()) {
+    const rep = frame().commit.reps.find((r) => r.name === state.repName);
+    $('file-label').textContent = rep?.name ?? '';
+    // swapped to the views, say when there's nothing further either way
+    const { c } = frame();
+    const atEnd = locked() && state.viewChangeIdx >= n - 1 && stepCommit(c, 1) < 0;
+    const atStart = locked() && state.viewChangeIdx <= 0 && stepCommit(c, -1) < 0;
+    $('change-label').textContent = (n ? `change ${state.viewChangeIdx + 1}/${n}`
+      : rep?.changed ? 'new view' : 'unchanged view') + (atEnd ? ' · end of views' : '');
+    markEnds(atStart, atEnd);
+    updateScrubber();
+    updateHash();
+  }
+  state.viewDecorations = markChange(repsEditor, state.viewChanges[state.viewChangeIdx], state.viewDecorations);
+}
+
+function markEnds(atStart, atEnd) {
+  $('btn-prev').classList.toggle('dead', atStart);
+  $('btn-next').classList.toggle('dead', atEnd);
+}
+
+// Mark a line change with the playhead and scroll to it; returns the new
+// decoration ids.
+function markChange(diff, change, decorations) {
+  const editor = diff.getModifiedEditor();
+  if (!change) return editor.deltaDecorations(decorations, []);
   const isDeletion = change.modifiedEndLineNumber === 0;
   const startLine = Math.max(1, change.modifiedStartLineNumber);
   const endLine = isDeletion ? startLine : change.modifiedEndLineNumber;
 
-  state.decorations = editor.deltaDecorations(state.decorations, [{
+  const ids = editor.deltaDecorations(decorations, [{
     range: new monacoApi.Range(startLine, 1, endLine, 1),
     options: {
       isWholeLine: true,
@@ -454,6 +553,7 @@ function revealCurrent() {
   // for large ranges (whole-file adds), anchor near the top rather than centering
   editor.revealLinesInCenter(startLine, Math.min(endLine, startLine + 24),
     reducedMotion ? monacoApi.editor.ScrollType.Immediate : monacoApi.editor.ScrollType.Smooth);
+  return ids;
 }
 
 /* ---------------- chrome rendering ---------------- */
@@ -467,9 +567,9 @@ function renderChrome() {
   bodyEl.textContent = fr.commit.body;
   bodyEl.hidden = !fr.commit.body;
 
-  const dir = fr.file.path.includes('/')
-    ? fr.file.path.slice(0, fr.file.path.lastIndexOf('/') + 1) : '';
-  const name = fr.file.path.slice(dir.length);
+  const path = fr.file?.path ?? viewStepRep(fr.commit).name;   // a view step: just the view
+  const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : '';
+  const name = path.slice(dir.length);
   $('file-label').innerHTML = '';
   const dirSpan = document.createElement('span');
   dirSpan.className = 'dir';
@@ -478,6 +578,116 @@ function renderChrome() {
 
   renderRailFiles();
   updateScrubber();
+  renderReps();
+}
+
+/* ---------------- representations ----------------
+   Other views of the change (.pr-timeline/reps/<name> on the step's tree),
+   shown beside the code as they stand at the current commit. */
+
+async function renderReps() {
+  const { commit, file } = frame();
+  const reps = commit.reps;
+  const panel = $('reps');
+  const full = !file || (places.has('swap') && swapped);   // the views take the code's place
+  panel.hidden = !reps.length || !(full || (repsOpen && !places.has('swap')));
+  document.documentElement.classList.toggle('reps-open', !panel.hidden);
+  document.documentElement.classList.toggle('reps-full', full && !panel.hidden);
+  $('tb-reps').classList.toggle('changed', panel.hidden && reps.some((r) => r.changed));
+  syncBarButtons();
+  if (panel.hidden) return;
+
+  const rep = reps.find((r) => r.name === state.repName)
+    ?? reps.find((r) => r.changed) ?? reps[0];
+  state.repName = rep.name;                // what's shown is what's picked
+  const body = $('reps-body');
+  const key = `${commit.sha.slice(0, 12)}:${rep.path}:${repsDelta}`;
+  if (body.dataset.key === key) return;    // same view; steps within a commit share it
+  body.dataset.key = key;
+  state.viewChanges = [];                  // until this view's diff is in
+  const tabs = $('reps-tabs');
+  tabs.innerHTML = '';
+  for (const r of reps) {
+    const tab = document.createElement('button');
+    tab.className = 'rep-tab';
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-selected', String(r === rep));
+    tab.classList.toggle('changed', r.changed);
+    tab.textContent = r.name;
+    if (r.changed) tab.title = 'changed in this step';
+    tab.addEventListener('click', () => { state.repName = r.name; renderReps(); });
+    tabs.appendChild(tab);
+  }
+  // what to diff against: the previous step (what this step changed in the
+  // view), or with d, the view's first version (the whole change so far)
+  const first = state.timeline.commits.find((c) => c.reps.some((r) => r.path === rep.path));
+  const delta = $('reps-delta');
+  delta.hidden = first.sha === commit.sha;
+  delta.textContent = repsDelta ? 'since last step' : 'since first';
+  const beforeSha = repsDelta ? (rep.changed ? commit.repsSince : null)
+    : (first.sha !== commit.sha ? first.sha : null);
+
+  let after, before, failed = false;
+  try {
+    [after, before] = await Promise.all([
+      viewAt(commit.sha, rep.path),
+      beforeSha ? viewAt(beforeSha, rep.path) : '',
+    ]);
+  } catch (err) {
+    verifyConnection();
+    [after, before, failed] = [`couldn't load ${rep.name}: ${err.message ?? err}`, '', true];
+  }
+  if (body.dataset.key !== key) return;    // stepped on while loading
+  if (failed) body.dataset.key = '';       // let retry load it again
+
+  // No earlier version: show the view plain, one pane, the same text both sides.
+  state.repDiffed = Boolean(before);
+  const m = monacoApi;
+  const seq = ++state.repSeq;              // fresh URIs: a model's URI can't be reused while it lives
+  const uri = (side) => m.Uri.from({ scheme: 'view', path: `/${seq}/${side}/${rep.name}` });
+  const old = repsEditor.getModel();
+  const original = m.editor.createModel(state.repDiffed ? before : after, undefined, uri('a'));
+  const modified = m.editor.createModel(after, undefined, uri('b'));
+  repsEditor.updateOptions({ renderSideBySide: splitView && state.repDiffed && !isMobile() });
+  applyFold();
+  repsEditor.setModel({ original, modified });
+  old?.original.dispose();
+  old?.modified.dispose();
+  repsEditor.getModifiedEditor().setScrollTop(0);
+  state.viewDecorations = [];              // they went with the old model
+  const ready = () => {                    // open on the first (or, stepping back, last) change
+    if (state.repSeq !== seq) return;
+    state.viewChanges = repsEditor.getLineChanges() ?? [];
+    state.viewChangeIdx = state.viewAt === 'end' ? Math.max(0, state.viewChanges.length - 1) : 0;
+    revealView();
+  };
+  if (!state.repDiffed) return ready();
+  const sub = repsEditor.onDidUpdateDiff(() => { sub.dispose(); ready(); });
+}
+
+// A view's text at a commit ('' when it doesn't exist there).
+async function viewAt(sha, path) {
+  return (await fetchFile({ commit: { sha }, file: { path, status: 'A' } })).after;
+}
+
+// The view a view step is about: the one its commit changed.
+function viewStepRep(commit) {
+  return commit.reps.find((r) => r.changed) ?? commit.reps[0];
+}
+
+function toggleReps() {
+  if (places.has('swap')) swapped = !swapped;   // flip the code area between code and views
+  else {
+    repsOpen = !repsOpen;
+    store?.setItem('prtl-reps', repsOpen ? '1' : '0');
+  }
+  finishFrame();                           // the status bar and playhead follow what's on screen
+}
+
+function toggleRepsDelta() {
+  repsDelta = !repsDelta;
+  store?.setItem('prtl-repsdelta', repsDelta ? '1' : '0');
+  renderReps();
 }
 
 function renderScrubber() {
@@ -497,7 +707,12 @@ function renderScrubber() {
       tick.dataset.frame = String(fi++);
       seg.appendChild(tick);
     });
-    if (!commit.files.length) seg.appendChild(document.createElement('div')).className = 'tick';
+    if (commit.viewOnly) {                 // a view step: one tick, marked as a view
+      const tick = seg.appendChild(document.createElement('div'));
+      tick.className = 'tick view';
+      tick.title = `${commit.subject}\nview`;
+      tick.dataset.frame = String(fi++);
+    }
     el.appendChild(seg);
   });
   bindScrubberDrag();
@@ -652,6 +867,8 @@ function handleNavKey(e) {
     case 'x': toggleFold(); return true;
     case 's': toggleSplit(); return true;
     case 'w': toggleWrap(); return true;
+    case 'v': toggleReps(); return true;
+    case 'd': toggleRepsDelta(); return true;
     case 'c': cycleCorner(); return true;
     case 'm': toggleCardMin(); return true;
     case '?': $('help').hidden = false; return true;
@@ -702,6 +919,8 @@ function bindKeys() {
   $('tb-fold').addEventListener('click', toggleFold);
   $('tb-split').addEventListener('click', toggleSplit);
   $('tb-wrap').addEventListener('click', toggleWrap);
+  $('tb-reps').addEventListener('click', toggleReps);
+  $('reps-delta').addEventListener('click', toggleRepsDelta);
   $('tb-keys').addEventListener('click', () => { $('help').hidden = false; });
   document.querySelector('.dot-min').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -743,6 +962,7 @@ function toggleSplit() {
   splitView = !splitView;
   store?.setItem('prtl-split', splitView ? '1' : '0');
   diffEditor.updateOptions({ renderSideBySide: splitView });
+  repsEditor.updateOptions({ renderSideBySide: splitView && state.repDiffed });
   syncBarButtons();
   revealCurrent();   // the modified editor is a new pane; re-anchor the playhead
 }
