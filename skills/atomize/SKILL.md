@@ -179,6 +179,19 @@ Write each as one file under `.pr-timeline/reps/` in the step's tree
   before the code that makes it so.
 - Otherwise, edit a view in the same commit as the code that changes what it
   shows. Leave it alone when the shape doesn't change.
+
+A reviewer steps through a view's changes one marked line at a time, so write
+it for that:
+
+- **One concept per line.** Every changed line should read on its own: write
+  `filter: low confidence only`, not a lone `lowConfOnly` appended to a list.
+- **Indent only for nesting.** Two spaces per level; no alignment padding or
+  wrapped continuations, which show up as stray marks.
+- **Name things on first use.** "the speech-to-text model (whisper)", not
+  "whisper" out of nowhere.
+- **Keep lines short**, about 34 characters, so they fit a phone unwrapped.
+- **Check it against the code** at that step: every name in the tree exists
+  there.
 - Reps belong on the replay branch only; `.pr-timeline/` paths never show in
   the code diff.
 
