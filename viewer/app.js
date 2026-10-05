@@ -24,7 +24,10 @@ let repsOpen = store?.getItem('prtl-reps') !== '0';
 let repsDelta = store?.getItem('prtl-repsdelta') !== '0';
 // Where views show, from ?place= (comma-separated): beside the code (default),
 // as steps of their own (step), or swapped with the code at full size (swap).
-const places = new Set((new URLSearchParams(location.search).get('place') ?? 'beside').split(','));
+// With no ?place=, views get their own steps and sit beside the code on a
+// desktop, swapped with it on a phone.
+const places = new Set((new URLSearchParams(location.search).get('place')
+  ?? `step,${isMobile() ? 'swap' : 'beside'}`).split(','));
 let swapped = false;   // swap mode: the views are showing instead of the code
 
 const state = {
