@@ -345,10 +345,15 @@ async function prevCommit() {
 
 async function loadFrame(idx, at) {
   const token = ++state.navToken;
+  const fromC = frame()?.c;
   state.frameIdx = Math.max(0, Math.min(idx, state.frames.length - 1));
   state.viewAt = at === 'end' ? 'end' : 0;
   const fr = frame();
-  if (!fr.file) state.repName = viewStepRep(fr.commit).name;   // a view step opens on its view
+  // Entering a step, follow the change: if the picked view didn't change
+  // here and another did, show that one. A tab picked within a step stays.
+  const changed = fr.commit.reps.find((r) => r.changed);
+  const picked = fr.commit.reps.find((r) => r.name === state.repName);
+  if (fr.c !== fromC && changed && !picked?.changed) state.repName = changed.name;
   renderChrome();
   $('change-label').textContent = '…';
   if (!fr.file) {                             // a view step: the view stands in for the code
@@ -566,6 +571,7 @@ async function renderReps() {
 
   const rep = reps.find((r) => r.name === state.repName)
     ?? reps.find((r) => r.changed) ?? reps[0];
+  state.repName = rep.name;                // what's shown is what's picked
   const body = $('reps-body');
   const key = `${commit.sha.slice(0, 12)}:${rep.path}:${repsDelta}`;
   if (body.dataset.key === key) return;    // same view; steps within a commit share it
