@@ -323,8 +323,8 @@ async function prev() {
       state.viewChangeIdx--;
       revealView();
     } else {
-      const to = stepCommit(c, -1);
-      if (to >= 0) await loadFrame(firstFrameOfCommit(to), 'end');
+      const to = stepCommit(c, -1);   // back to its last file, as stepping back through code does
+      if (to >= 0) await loadFrame(state.frames.findLastIndex((fr) => fr.c === to), 'end');
     }
   } else if (state.changeIdx > 0) {
     state.changeIdx--;
