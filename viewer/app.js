@@ -657,12 +657,31 @@ async function renderReps() {
   state.viewDecorations = [];              // they went with the old model
   const ready = () => {                    // open on the first (or, stepping back, last) change
     if (state.repSeq !== seq) return;
-    state.viewChanges = repsEditor.getLineChanges() ?? [];
+    state.viewChanges = joinNearby(repsEditor.getLineChanges() ?? []);
     state.viewChangeIdx = state.viewAt === 'end' ? Math.max(0, state.viewChanges.length - 1) : 0;
     revealView();
   };
   if (!state.repDiffed) return ready();
   const sub = repsEditor.onDidUpdateDiff(() => { sub.dispose(); ready(); });
+}
+
+// A line diff splits one idea into slivers when a line or two inside it
+// stayed the same. In a view, a stop should be a thought, so changes two or
+// fewer unchanged lines apart become one stop. Code is stepped as diffed.
+function joinNearby(changes) {
+  const end = (c) => c.modifiedEndLineNumber || c.modifiedStartLineNumber;   // a deletion has no end
+  const out = [];
+  for (const c of changes) {
+    const last = out[out.length - 1];
+    if (last && c.modifiedStartLineNumber - end(last) - 1 <= 2) {
+      out[out.length - 1] = {
+        ...last,
+        modifiedEndLineNumber: Math.max(end(last), end(c)),
+        originalEndLineNumber: Math.max(last.originalEndLineNumber, c.originalEndLineNumber),
+      };
+    } else out.push(c);
+  }
+  return out;
 }
 
 // A view's text at a commit ('' when it doesn't exist there).
