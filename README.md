@@ -92,10 +92,11 @@ second commit subject
 - A sidebar with the commit list and the current commit's files (`t`, or the
   `sidebar` button) — it docks beside the editor, pushing it over.
 - `x` (or `fold`) folds unchanged regions when you want just the deltas.
-- `v` (or `views`) shows other views of the step beside the code, such as a
-  call tree or a file-tree diff, when the replay carries them under
-  `.pr-timeline/reps/` (see the atomize skill). A dot marks the views the step
-  changed, and `d` toggles showing what it changed.
+- `v` (or `views`) shows other views of the step next to the code, such as a
+  call tree or a component tree, when the replay carries them under
+  `.pr-timeline/reps/` (see the atomize skill). They render in the editor and
+  diff like code: a dot marks the views the step changed, and `d` switches
+  between what this step changed and the whole change so far.
 - Merge commits are skipped: a merge has no single-parent diff, so it would be
   a step you can't enter. A branch that merged `main` mid-flight shows the
   commits authored on it. Uncommitted work isn't shown at all — every step

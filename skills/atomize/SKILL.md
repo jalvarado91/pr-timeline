@@ -165,17 +165,20 @@ Rules while editing intermediate states:
 
 ### Representations (optional)
 
-A step can also carry other views of the change, which the viewer shows beside
-the code: a call tree, a component tree, a file tree, types, pseudocode, or a
-`diff` drawn over any of them. Write each as one file under
-`.pr-timeline/reps/` in the step's tree (`call-tree.diff`, `file-tree.txt`).
-`.diff` gets +/- colouring; anything else shows as plain text.
+A step can also carry other views of the change, which the viewer shows next
+to the code: a call tree, a component tree, a file tree, types, pseudocode.
+Write each as one file under `.pr-timeline/reps/` in the step's tree
+(`call-tree.txt`, `admin-tree.txt`).
 
-- Commit a rep **in the same commit as the code it describes**. A commit that
-  touches only reps is no step, so its view first shows at the next one.
-- Edit a rep in the step that changes what it shows; the viewer marks it and
-  shows what changed against the previous step. Leave it alone otherwise; it
-  keeps showing as it stands.
+- A view is a **snapshot**: the shape as it stands at that step, with no
+  `+`/`-` markers. git keeps its history, and the viewer diffs it like code,
+  against the previous step or its first version.
+- To show where things start, add a view as it is before the change, in a
+  commit of its own at the start. A commit that touches only views is a view
+  step: it shows the view in place of the code. Use one to show a shape just
+  before the code that makes it so.
+- Otherwise, edit a view in the same commit as the code that changes what it
+  shows. Leave it alone when the shape doesn't change.
 - Reps belong on the replay branch only; `.pr-timeline/` paths never show in
   the code diff.
 
