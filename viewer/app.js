@@ -304,7 +304,10 @@ async function next() {
     if (state.viewChangeIdx < state.viewChanges.length - 1) {
       state.viewChangeIdx++;
       revealView();
-    } else if (c < state.timeline.commits.length - 1) await loadFrame(firstFrameOfCommit(c + 1), 0);
+    } else {
+      const to = stepCommit(c, 1);
+      if (to >= 0) await loadFrame(firstFrameOfCommit(to), 0);
+    }
   } else if (state.changeIdx < state.changes.length - 1) {
     state.changeIdx++;
     revealCurrent();
@@ -319,13 +322,27 @@ async function prev() {
     if (state.viewChangeIdx > 0) {
       state.viewChangeIdx--;
       revealView();
-    } else if (c > 0) await loadFrame(firstFrameOfCommit(c - 1), 'end');
+    } else {
+      const to = stepCommit(c, -1);
+      if (to >= 0) await loadFrame(firstFrameOfCommit(to), 'end');
+    }
   } else if (state.changeIdx > 0) {
     state.changeIdx--;
     revealCurrent();
   } else if (state.frameIdx > 0) {
     await loadFrame(state.frameIdx - 1, 'end');
   }
+}
+
+// Swapped to the views, a step whose views didn't change has nothing to
+// show, so stepping skips it. Returns the commit to step to, or -1 at the end.
+const locked = () => places.has('swap') && swapped;
+function stepCommit(c, dir) {
+  const { commits } = state.timeline;
+  for (let i = c + dir; i >= 0 && i < commits.length; i += dir) {
+    if (!locked() || commits[i].reps.some((r) => r.changed)) return i;
+  }
+  return -1;
 }
 
 function firstFrameOfCommit(c) {
@@ -482,6 +499,7 @@ function revealCurrent() {
   if (viewFills()) return revealView();
   const n = state.changes.length;
   $('change-label').textContent = n ? `change ${state.changeIdx + 1}/${n}` : 'no text changes';
+  markEnds(false, false);
   updateScrubber();
   updateHash();
   state.decorations = markChange(diffEditor, state.changes[state.changeIdx], state.decorations);
@@ -494,12 +512,22 @@ function revealView() {
   if (viewFills()) {
     const rep = frame().commit.reps.find((r) => r.name === state.repName);
     $('file-label').textContent = rep?.name ?? '';
-    $('change-label').textContent = n ? `change ${state.viewChangeIdx + 1}/${n}`
-      : rep?.changed ? 'new view' : 'unchanged view';
+    // swapped to the views, say when there's nothing further either way
+    const { c } = frame();
+    const atEnd = locked() && state.viewChangeIdx >= n - 1 && stepCommit(c, 1) < 0;
+    const atStart = locked() && state.viewChangeIdx <= 0 && stepCommit(c, -1) < 0;
+    $('change-label').textContent = (n ? `change ${state.viewChangeIdx + 1}/${n}`
+      : rep?.changed ? 'new view' : 'unchanged view') + (atEnd ? ' · end of views' : '');
+    markEnds(atStart, atEnd);
     updateScrubber();
     updateHash();
   }
   state.viewDecorations = markChange(repsEditor, state.viewChanges[state.viewChangeIdx], state.viewDecorations);
+}
+
+function markEnds(atStart, atEnd) {
+  $('btn-prev').classList.toggle('dead', atStart);
+  $('btn-next').classList.toggle('dead', atEnd);
 }
 
 // Mark a line change with the playhead and scroll to it; returns the new

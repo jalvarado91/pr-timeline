@@ -397,6 +397,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   flex-shrink: 0;
 }
 .nav-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.1); }
+.nav-btn.dead { opacity: 0.3; pointer-events: none; }   /* nothing further this way */
 
 /* ---- status bar ---- */
 
