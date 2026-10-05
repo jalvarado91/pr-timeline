@@ -517,7 +517,8 @@ function revealView() {
     const atEnd = locked() && state.viewChangeIdx >= n - 1 && stepCommit(c, 1) < 0;
     const atStart = locked() && state.viewChangeIdx <= 0 && stepCommit(c, -1) < 0;
     $('change-label').textContent = (n ? `change ${state.viewChangeIdx + 1}/${n}`
-      : rep?.changed ? 'new view' : 'unchanged view') + (atEnd ? ' · end of views' : '');
+      : rep?.changed ? 'new view' : 'unchanged view')
+      + (atEnd ? ' · end of views' : atStart ? ' · start of views' : '');
     markEnds(atStart, atEnd);
     updateScrubber();
     updateHash();
