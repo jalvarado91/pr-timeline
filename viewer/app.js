@@ -44,6 +44,10 @@ const state = {
   repName: null,     // the view picked in the reps panel; kept across steps
   repDiffed: false,  // the shown view has an earlier version to diff against
   repSeq: 0,
+  viewChanges: [],   // the shown view's own line changes, walked like code's when it fills the screen
+  viewChangeIdx: 0,
+  viewAt: 0,         // where to land in the next view: its first change, or 'end'
+  viewDecorations: [],
 };
 
 let monacoApi = null;
@@ -290,14 +294,17 @@ function syncBarButtons() {
 
 function frame() { return state.frames[state.frameIdx]; }
 
-// While a view fills the code area, the code's changes are out of sight, so
-// stepping walks commits: every step then shows something.
+// While a view fills the code area, stepping walks the view's own changes,
+// then moves a commit on: the frames of one commit all show the same view.
 const viewFills = () => !frame().file || (places.has('swap') && swapped);
 
 async function next() {
   if (viewFills()) {
     const c = frame().c;
-    if (c < state.timeline.commits.length - 1) await loadFrame(firstFrameOfCommit(c + 1), 0);
+    if (state.viewChangeIdx < state.viewChanges.length - 1) {
+      state.viewChangeIdx++;
+      revealView();
+    } else if (c < state.timeline.commits.length - 1) await loadFrame(firstFrameOfCommit(c + 1), 0);
   } else if (state.changeIdx < state.changes.length - 1) {
     state.changeIdx++;
     revealCurrent();
@@ -309,7 +316,10 @@ async function next() {
 async function prev() {
   if (viewFills()) {
     const c = frame().c;
-    if (c > 0) await loadFrame(firstFrameOfCommit(c - 1), 0);
+    if (state.viewChangeIdx > 0) {
+      state.viewChangeIdx--;
+      revealView();
+    } else if (c > 0) await loadFrame(firstFrameOfCommit(c - 1), 'end');
   } else if (state.changeIdx > 0) {
     state.changeIdx--;
     revealCurrent();
@@ -336,6 +346,7 @@ async function prevCommit() {
 async function loadFrame(idx, at) {
   const token = ++state.navToken;
   state.frameIdx = Math.max(0, Math.min(idx, state.frames.length - 1));
+  state.viewAt = at === 'end' ? 'end' : 0;
   const fr = frame();
   if (!fr.file) state.repName = viewStepRep(fr.commit).name;   // a view step opens on its view
   renderChrome();
@@ -463,20 +474,39 @@ function showPlaceholder(text) {
 /* ---------------- reveal ---------------- */
 
 function revealCurrent() {
-  const change = state.changes[state.changeIdx];
-  const editor = diffEditor.getModifiedEditor();
+  if (viewFills()) return revealView();
   const n = state.changes.length;
-  $('change-label').textContent = n ? `change ${state.changeIdx + 1}/${n}`
-    : frame().file ? 'no text changes' : 'view step';
+  $('change-label').textContent = n ? `change ${state.changeIdx + 1}/${n}` : 'no text changes';
   updateScrubber();
   updateHash();
-  if (!change) return;
+  state.decorations = markChange(diffEditor, state.changes[state.changeIdx], state.decorations);
+}
 
+// The view's counterpart: the same playhead, in the view's editor, and when
+// the view fills the screen, its name and change count in the status bar.
+function revealView() {
+  const n = state.viewChanges.length;
+  if (viewFills()) {
+    const rep = frame().commit.reps.find((r) => r.name === state.repName);
+    $('file-label').textContent = rep?.name ?? '';
+    $('change-label').textContent = n ? `change ${state.viewChangeIdx + 1}/${n}`
+      : rep?.changed ? 'new view' : 'unchanged view';
+    updateScrubber();
+    updateHash();
+  }
+  state.viewDecorations = markChange(repsEditor, state.viewChanges[state.viewChangeIdx], state.viewDecorations);
+}
+
+// Mark a line change with the playhead and scroll to it; returns the new
+// decoration ids.
+function markChange(diff, change, decorations) {
+  const editor = diff.getModifiedEditor();
+  if (!change) return editor.deltaDecorations(decorations, []);
   const isDeletion = change.modifiedEndLineNumber === 0;
   const startLine = Math.max(1, change.modifiedStartLineNumber);
   const endLine = isDeletion ? startLine : change.modifiedEndLineNumber;
 
-  state.decorations = editor.deltaDecorations(state.decorations, [{
+  const ids = editor.deltaDecorations(decorations, [{
     range: new monacoApi.Range(startLine, 1, endLine, 1),
     options: {
       isWholeLine: true,
@@ -490,6 +520,7 @@ function revealCurrent() {
   // for large ranges (whole-file adds), anchor near the top rather than centering
   editor.revealLinesInCenter(startLine, Math.min(endLine, startLine + 24),
     reducedMotion ? monacoApi.editor.ScrollType.Immediate : monacoApi.editor.ScrollType.Smooth);
+  return ids;
 }
 
 /* ---------------- chrome rendering ---------------- */
@@ -539,6 +570,7 @@ async function renderReps() {
   const key = `${commit.sha.slice(0, 12)}:${rep.path}:${repsDelta}`;
   if (body.dataset.key === key) return;    // same view; steps within a commit share it
   body.dataset.key = key;
+  state.viewChanges = [];                  // until this view's diff is in
   const tabs = $('reps-tabs');
   tabs.innerHTML = '';
   for (const r of reps) {
@@ -587,15 +619,16 @@ async function renderReps() {
   repsEditor.setModel({ original, modified });
   old?.original.dispose();
   old?.modified.dispose();
-  const ed = repsEditor.getModifiedEditor();
-  ed.setScrollTop(0);
-  if (state.repDiffed) {                   // open on the first thing that changed
-    const sub = repsEditor.onDidUpdateDiff(() => {
-      sub.dispose();
-      const change = repsEditor.getLineChanges()?.[0];
-      if (change) ed.revealLineInCenterIfOutsideViewport(Math.max(1, change.modifiedStartLineNumber));
-    });
-  }
+  repsEditor.getModifiedEditor().setScrollTop(0);
+  state.viewDecorations = [];              // they went with the old model
+  const ready = () => {                    // open on the first (or, stepping back, last) change
+    if (state.repSeq !== seq) return;
+    state.viewChanges = repsEditor.getLineChanges() ?? [];
+    state.viewChangeIdx = state.viewAt === 'end' ? Math.max(0, state.viewChanges.length - 1) : 0;
+    revealView();
+  };
+  if (!state.repDiffed) return ready();
+  const sub = repsEditor.onDidUpdateDiff(() => { sub.dispose(); ready(); });
 }
 
 // A view's text at a commit ('' when it doesn't exist there).
@@ -614,7 +647,7 @@ function toggleReps() {
     repsOpen = !repsOpen;
     store?.setItem('prtl-reps', repsOpen ? '1' : '0');
   }
-  renderReps();
+  finishFrame();                           // the status bar and playhead follow what's on screen
 }
 
 function toggleRepsDelta() {
