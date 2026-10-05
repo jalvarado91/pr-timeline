@@ -658,7 +658,7 @@ async function renderReps() {
   state.viewDecorations = [];              // they went with the old model
   const ready = () => {                    // open on the first (or, stepping back, last) change
     if (state.repSeq !== seq) return;
-    state.viewChanges = joinNearby(repsEditor.getLineChanges() ?? []);
+    state.viewChanges = joinNearby(repsEditor.getLineChanges() ?? [], repsEditor.getModifiedEditor().getModel());
     state.viewChangeIdx = state.viewAt === 'end' ? Math.max(0, state.viewChanges.length - 1) : 0;
     revealView();
   };
@@ -668,13 +668,25 @@ async function renderReps() {
 
 // A line diff splits one idea into slivers when a line or two inside it
 // stayed the same. In a view, a stop should be a thought, so changes two or
-// fewer unchanged lines apart become one stop. Code is stepped as diffed.
-function joinNearby(changes) {
+// fewer unchanged lines apart become one stop, as long as they sit in the
+// same section: no blank or top-level line between them, and the next one
+// doesn't open a section of its own. Code is stepped as diffed.
+function joinNearby(changes, model) {
   const end = (c) => c.modifiedEndLineNumber || c.modifiedStartLineNumber;   // a deletion has no end
+  const text = (n) => model.getLineContent(n);
+  const inside = (n) => /^\s+\S/.test(text(n));             // indented, not blank or top-level
+  const opensSection = (c) => {
+    for (let n = c.modifiedStartLineNumber; n <= c.modifiedEndLineNumber; n++) {
+      if (text(n).trim()) return !inside(n);
+    }
+    return false;
+  };
   const out = [];
   for (const c of changes) {
     const last = out[out.length - 1];
-    if (last && c.modifiedStartLineNumber - end(last) - 1 <= 2) {
+    const gap = last ? c.modifiedStartLineNumber - end(last) - 1 : Infinity;
+    const between = () => Array.from({ length: Math.max(0, gap) }, (_, i) => end(last) + 1 + i);
+    if (gap <= 2 && between().every(inside) && !opensSection(c)) {
       out[out.length - 1] = {
         ...last,
         modifiedEndLineNumber: Math.max(end(last), end(c)),
